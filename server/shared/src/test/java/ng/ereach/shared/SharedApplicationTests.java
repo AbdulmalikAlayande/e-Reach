@@ -204,7 +204,7 @@ public class SharedApplicationTests {
 	 * <p> Build-level policy test that validates the compile-time surface of the
 	 * shared module remains intentionally small.</p>
 	 *
-	 * <p>This test runs {@code mvn -pl backend/shared dependency:tree} via the
+	 * <p>This test runs {@code mvn -pl shared dependency:tree} via the
 	 * Maven wrapper and scans the produced dependency tree to ensure the shared
 	 * module exposes only the approved compile-scoped dependency
 	 * {@code com.github.f4b6a3:uuid-creator}. Any other {@code :compile} scoped
@@ -226,13 +226,13 @@ public class SharedApplicationTests {
 		try {
 			//Given: The shared module's pom.xml
 			ProcessBuilder processBuilder = configureProcessBuilder(
-				new String[]{"cmd.exe", "/c", "mvnw.cmd", "-pl", "backend/shared", "dependency:tree"},
-				new String[]{"./mvnw", "-pl", "backend/shared", "dependency:tree"}
+				new String[]{"cmd.exe", "/c", "mvnw.cmd", "-pl", "shared", "dependency:tree"},
+				new String[]{"./mvnw", "-pl", "shared", "dependency:tree"}
 			);
 			
 			List<String> depsTreeLines = new ArrayList<>();
 			
-			//When: run .\mvnw.cmd -pl backend/shared dependency:tree runs at the root
+			//When: run .\mvnw.cmd -pl shared dependency:tree runs at the root
 			Process process = processBuilder.start();
 			try(BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
 				String line;
@@ -259,7 +259,7 @@ public class SharedApplicationTests {
 	 * Inspect the dependency tree output for compile-scope dependencies and validate policy.
 	 *
 	 * <p>By design the shared module should expose a minimal compile-time surface. This
-	 * helper scans the lines produced by {@code mvn -pl backend/shared dependency:tree}
+	 * helper scans the lines produced by {@code mvn -pl shared dependency:tree}
 	 * and ensures there are no unexpected {@code :compile} scoped dependencies. The only
 	 * permitted compile-scoped dependency is {@code com.github.f4b6a3:uuid-creator} which
 	 * is required by the shared utilities. Any other compile-scoped dependency will cause
