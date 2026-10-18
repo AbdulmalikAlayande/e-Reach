@@ -951,11 +951,13 @@ BMI is calculated (weight in kg divided by height in metres squared) and shown, 
 7. `patient_kobo = copay_kobo`; `payer_kobo = amount_kobo − copay_kobo`; the charge stores the `tariff_version_id` it used.
 8. If the rule needs pre-authorisation and no code is recorded, the line is not cleared (F12) until a code is entered, or the patient chooses to pay the cash price instead.
 
-**Worked example.** Ilera Eko pays this facility ₦4,000 for a GOPD consultation, so the tariff is `400000` kobo, and the plan's co-payment is 10%, which is `1000` basis points. Co-payment = (400000 × 1000 + 5000) / 10000 = 400005000 / 10000 = 40000 kobo after whole-number division. The patient pays `40000` kobo (₦400) and the claim line is `360000` kobo (₦3,600).
+**Worked example.** 
+Ilera Eko pays this facility ₦4,000 for a GOPD consultation, so the tariff is `400000` kobo, and the plan's co-payment is 10%, which is `1000` basis points. Co-payment = (400000 × 1000 + 5000) / 10000 = 400005000 / 10000 = 40000 kobo after whole-number division. The patient pays `40000` kobo (₦400) and the claim line is `360000` kobo (₦3,600).
 
-**Claim status.** `draft` → `ready` → `exported` (file produced) → `submitted` (the officer uploaded it and recorded the date, channel, payer reference and their name) → `acknowledged` → `approved`, `partly_approved` or `rejected` → `paid`. A payer query moves a claim to `queried`; after the fix it goes back to `ready`. Exporting a file never marks a claim submitted, because a file on a desktop has not reached anyone.
+**Claim status.** 
+`draft` → `ready` → `exported` (file produced) → `submitted` (the officer uploaded it and recorded the date, channel, payer reference and their name) → `acknowledged` → `approved`, `partly_approved` or `rejected` → `paid`. A payer query moves a claim to `queried`; after the fix it goes back to `ready`. Exporting a file never marks a claim submitted, because a file on a desktop has not reached anyone.
 
-**A claim is ready only when** it has a member number, coverage active on the service date, at least one ICD-10 diagnosis, the encounter's doctor with a licence number on their practitioner profile, a tariff version on every line, a pre-authorisation code on every line that needs one, and current `payer_claim_sharing` consent for that payer (F5).
+**A claim is ready only when** it has a member number, coverage active on the service date, at least one ICD-10 diagnosis, the encounter's doctor with a license number on their practitioner profile, a tariff version on every line, a pre-authorisation code on every line that needs one, and current `payer_claim_sharing` consent for that payer (F5).
 
 **Rules**
 
