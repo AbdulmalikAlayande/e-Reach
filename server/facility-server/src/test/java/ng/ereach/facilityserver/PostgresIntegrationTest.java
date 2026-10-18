@@ -1,4 +1,4 @@
-package ng.ereach;
+package ng.ereach.facilityserver;
 
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
