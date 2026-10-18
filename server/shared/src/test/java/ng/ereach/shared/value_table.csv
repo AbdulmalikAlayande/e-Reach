@@ -1,0 +1,9 @@
+Amount (kobo), Basis points, Expected (kobo), Why this row exists
+15, 5000, 8, 7.5 rounds up
+14, 5000, 7, 7.0 stays
+1, 4999, 0, 0.4999 rounds down
+1, 5000, 1, exactly half rounds up
+999, 10000, 999, 100% returns the whole amount
+999, 0, 0, 0% returns nothing
+0, 10000, 0, nothing stays nothing
+400000, 1000, 40000, 10% of the PRD worked example
