@@ -1,4 +1,4 @@
-package ng.ereach.shared.utils;
+package ng.ereach.shared.identity;
 
 import com.github.f4b6a3.uuid.UuidCreator;
 import java.util.UUID;
