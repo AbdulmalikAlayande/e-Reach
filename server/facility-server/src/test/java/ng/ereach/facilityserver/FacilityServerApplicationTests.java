@@ -1,4 +1,4 @@
-package ng.ereach;
+package ng.ereach.facilityserver;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
