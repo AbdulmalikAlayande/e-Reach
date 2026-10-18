@@ -39,8 +39,7 @@ public class SharedApplicationTests {
 	 * @see #configureProcessBuilder(String[], String[])
 	 * @since 0.0.1
 	 */
-	public static final String PROJECT_ROOT_DIRECTORY = "C:\\Users\\HP\\IdeaProjects\\eReach\\server\\";
-	
+	public static final String PROJECT_ROOT_DIRECTORY = "C:\\Users\\HP\\IdeaProjects\\eReach\\server";
 	/**
 	 * Build and return a configured {@link ProcessBuilder} ready to execute the
 	 * Maven wrapper from the repository root.
