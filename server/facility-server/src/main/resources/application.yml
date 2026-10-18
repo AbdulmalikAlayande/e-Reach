@@ -1,0 +1,23 @@
+spring:
+  application:
+    name: facility-server
+  datasource:
+    url: jdbc:postgresql://localhost:5433/ereach
+    username: ereach_app
+    password: ereach_app
+    driver-class-name: org.postgresql.Driver
+  flyway:
+    user: ereach_owner
+    password: ereach_owner
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  session:
+    jdbc:
+      initialize-schema: never
+  modulith:
+    events:
+      jdbc:
+        schema-initialization:
+          enabled: false
