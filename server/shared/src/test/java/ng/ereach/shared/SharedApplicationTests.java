@@ -4,8 +4,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
 
 import java.io.BufferedReader;
-import java.io.File;
 import java.io.InputStreamReader;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -27,9 +27,8 @@ public class SharedApplicationTests {
 	 *
 	 * <p>Implementation notes:</p>
 	 * <ul>
-	 *   <li>The value is expressed as an absolute Windows path for the primary
-	 *       development environment. When running tests on non-Windows CI or
-	 *       developer machines update this constant or adapt tests accordingly.</li>
+	 *   <li>The value is derived from the module test working directory, so it is
+	 *       portable across developer machines and CI environments.</li>
 	 *   <li>The constant is immutable and intended only for test use; it has no
 	 *       effect at application runtime.</li>
 	 *   <li>ProcessBuilder instances created by {@link #configureProcessBuilder(String[], String[])}
@@ -39,7 +38,7 @@ public class SharedApplicationTests {
 	 * @see #configureProcessBuilder(String[], String[])
 	 * @since 0.0.1
 	 */
-	public static final String PROJECT_ROOT_DIRECTORY = "C:\\Users\\HP\\IdeaProjects\\eReach\\server";
+	public static final Path PROJECT_ROOT_DIRECTORY = Path.of("").toAbsolutePath().getParent();
 	/**
 	 * Build and return a configured {@link ProcessBuilder} ready to execute the
 	 * Maven wrapper from the repository root.
@@ -67,7 +66,6 @@ public class SharedApplicationTests {
 	 */
 	private ProcessBuilder configureProcessBuilder(String[] winCommands, String[] unixCommands) {
 		
-		File projectDir = new File(PROJECT_ROOT_DIRECTORY);
 		ProcessBuilder processBuilder;
 		
 		String osName = System.getProperty("os.name").toLowerCase();
@@ -76,7 +74,7 @@ public class SharedApplicationTests {
 		else
 			processBuilder = new ProcessBuilder(unixCommands);
 		
-		processBuilder.directory(projectDir);
+		processBuilder.directory(PROJECT_ROOT_DIRECTORY.toFile());
 		processBuilder.redirectErrorStream(true);
 		
 		return processBuilder;

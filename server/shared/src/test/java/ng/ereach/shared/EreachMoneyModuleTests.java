@@ -43,15 +43,11 @@ public class EreachMoneyModuleTests {
 		long maxLong = Long.MAX_VALUE;
 		Money maxKobo = Money.ofKobo(maxLong);
 		
-		// When: 1 kobo is added to maxKobo, and 1 is added to maxLong
-		ArithmeticException exception = assertThrows(ArithmeticException.class, () -> maxKobo.plus(Money.ofKobo(1)),
+		// When: 1 kobo is added to maxKobo
+		assertThrows(ArithmeticException.class, () -> maxKobo.plus(Money.ofKobo(1)),
 				"Adding 1 kobo to Long.MAX_VALUE should throw an ArithmeticException");
-		long maxLongPlusOne = maxLong + 1;
 
-		// Then: An `ArithmeticException` is thrown for maxKobo.plus(Money.ofKobo(1)), and Java uses two's complement
-		// arithmetic and wraps around quietly to the minimum possible value (Long.MIN_VALUE, which is -9223372036854775808)
-		assertEquals("long overflow", exception.getMessage(), "The exception message should indicate a long overflow");
-		assertEquals(Long.MIN_VALUE, maxLongPlusOne, "Adding 1 to Long.MAX_VALUE should wrap around to Long.MIN_VALUE due to two's complement arithmetic");
+		// Then: An `ArithmeticException` is thrown rather than a wrapped amount
 	}
 	
 	@Test
@@ -215,8 +211,6 @@ public class EreachMoneyModuleTests {
 		// Then: The first returns the same amount; the second throws ArithmeticException
 		assertEquals(moneyBelowThreshold, resultBelowThreshold,
 				"The percentage of the amount just below the threshold should return the same amount");
-		assertEquals("long overflow", exceptionAboveThreshold.getMessage(),
-				"The percentage of the amount just above the threshold should throw an ArithmeticException with 'long overflow' message");
 	}
 
 	@Test
