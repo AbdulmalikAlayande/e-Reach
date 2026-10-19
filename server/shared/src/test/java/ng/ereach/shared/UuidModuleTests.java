@@ -2,6 +2,7 @@ package ng.ereach.shared;
 
 import ng.ereach.shared.identity.FacilityId;
 import ng.ereach.shared.identity.Ids;
+import ng.ereach.shared.identity.PersonId;
 import ng.ereach.shared.identity.UserId;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -90,13 +91,15 @@ public class UuidModuleTests {
 	public void testBrandedNominalIdsDoesNotAcceptNull() {
 		// Given: Nothing
 		
-		// When: new UserId(null) is called or the same for new FacilityId(null)
+		// When: each typed ID is constructed with null
 		IllegalArgumentException nullUserIdException = assertThrows(IllegalArgumentException.class, () -> new UserId(null));
 		IllegalArgumentException nullFacilityIdException = assertThrows(IllegalArgumentException.class, () -> new FacilityId(null));
+		IllegalArgumentException nullPersonIdException = assertThrows(IllegalArgumentException.class, () -> new PersonId(null));
 		
 		// Then: An IllegalArgumentException is thrown with the correct validation message
 		assertEquals("UUID cannot be null", nullUserIdException.getMessage());
 		assertEquals("UUID cannot be null", nullFacilityIdException.getMessage());
+		assertEquals("UUID cannot be null", nullPersonIdException.getMessage());
 	}
 	
 	/**
@@ -106,20 +109,26 @@ public class UuidModuleTests {
 	@Test
 	@DisplayName("TC-004-07 | Typed IDs compare by value and by type")
 	public void testBrandedNominalIdsCompareByValueAndType() {
-		// Given: Two PersonIds wrapping the same UUID, and a FacilityId wrapping that UUID too
+		// Given: Two IDs of each type wrapping the same UUID
 		UUID sameUuid = Ids.newId();
 		UserId userId1 = new UserId(sameUuid);
 		UserId userId2 = new UserId(sameUuid);
 		FacilityId facilityId = new FacilityId(sameUuid);
+		PersonId personId1 = new PersonId(sameUuid);
+		PersonId personId2 = new PersonId(sameUuid);
 		
 		// When: They are compared with equals and hashCode
 		boolean userIdsEqual = Objects.equals(userId1, userId2);
 		boolean userIdAndFacilityIdEqual = Objects.equals(userId1, facilityId);
+		boolean personIdsEqual = Objects.equals(personId1, personId2);
 		
 		// Then: The two PersonIds are equal with equal hash codes; the PersonId and the FacilityId are not equal
 		assertTrue(userIdsEqual, "Two UserIds wrapping the same UUID should be equal");
 		assertEquals(userId1.hashCode(), userId2.hashCode(), "Two UserIds wrapping the same UUID should have the same hash code");
 		assertFalse(userIdAndFacilityIdEqual, "A UserId and a FacilityId wrapping the same UUID should not be equal");
+		assertTrue(personIdsEqual, "Two PersonIds wrapping the same UUID should be equal");
+		assertEquals(personId1.hashCode(), personId2.hashCode(), "Two PersonIds wrapping the same UUID should have the same hash code");
+		assertFalse(Objects.equals(personId1, userId1), "A PersonId and a UserId wrapping the same UUID should not be equal");
 	}
 	
 	/**
@@ -132,13 +141,15 @@ public class UuidModuleTests {
 		// Given: A valid UUID string
 		UUID uuid = Ids.newId();
 		
-		// When: UserId.of(text).toString() is called
+		// When: each typed ID factory parses the text and converts it back to a string
 		String userIdString = UserId.of(uuid.toString()).toString();
-		String faciltiyIdString = FacilityId.of(uuid.toString()).toString();
+		String facilityIdString = FacilityId.of(uuid.toString()).toString();
+		String personIdString = PersonId.of(uuid.toString()).toString();
 		
 		// Then: It returns exactly the same text, not UserId[value=...]
 		assertEquals(uuid.toString(), userIdString, "toString() must output the plain UUID text value directly");
-		assertEquals(uuid.toString(), faciltiyIdString, "toString() must output the plain UUID text value directly");
+		assertEquals(uuid.toString(), facilityIdString, "toString() must output the plain UUID text value directly");
+		assertEquals(uuid.toString(), personIdString, "toString() must output the plain UUID text value directly");
 	}
 	
 	/**
@@ -151,11 +162,15 @@ public class UuidModuleTests {
 		// Given: A text `not-a-uuid`
 		String nonUuidText = "not-a-uuid";
 		
-		// When: `UserId.of(text)` is called
+		// When: each typed ID factory parses the invalid text
 		IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> UserId.of(nonUuidText));
+		IllegalArgumentException facilityException = assertThrows(IllegalArgumentException.class, () -> FacilityId.of(nonUuidText));
+		IllegalArgumentException personException = assertThrows(IllegalArgumentException.class, () -> PersonId.of(nonUuidText));
 		
 		// Then: An `IllegalArgumentException` is thrown
 		assertNotNull(exception.getMessage(), "Exception should contain a descriptive error message");
+		assertNotNull(facilityException.getMessage(), "Exception should contain a descriptive error message");
+		assertNotNull(personException.getMessage(), "Exception should contain a descriptive error message");
 	}
 	
 	/**
@@ -167,9 +182,10 @@ public class UuidModuleTests {
 	public void testBrandedNominalIdsCanCreateNewUniqueIds() {
 		// Given: Nothing
 		
-		// When: `UserId.newId()` is called
+		// When: each typed ID factory creates a fresh ID
 		UserId freshlyCreatedUserId = UserId.newId();
 		FacilityId freshlyCreatedFacilityId = FacilityId.newId();
+		PersonId freshlyCreatedPersonId = PersonId.newId();
 		
 		// Then: It returns a `UserId` whose value is version 7
 		assertNotNull(freshlyCreatedUserId, "The factory method must return a valid UserId instance");
@@ -179,5 +195,9 @@ public class UuidModuleTests {
 		assertNotNull(freshlyCreatedFacilityId, "The factory method must return a valid UserId instance");
 		assertNotNull(freshlyCreatedFacilityId.uuid(), "The wrapped UUID value must not be null");
 		assertEquals(7, freshlyCreatedFacilityId.uuid().version(), "The underlying UUID version must be 7 (UUIDv7)");
+
+		assertNotNull(freshlyCreatedPersonId, "The factory method must return a valid PersonId instance");
+		assertNotNull(freshlyCreatedPersonId.uuid(), "The wrapped UUID value must not be null");
+		assertEquals(7, freshlyCreatedPersonId.uuid().version(), "The underlying UUID version must be 7 (UUIDv7)");
 	}
 }
