@@ -195,8 +195,6 @@ public class EreachMoneyModuleTests {
 		}
 	}
 	
-	//ID	Checks	Given	When	Then
-	// 		percentBps(10_000) is called on each	The first returns the same amount; the second throws ArithmeticException
 	@Test
 	@DisplayName("TC-004-20 | A percentage too large for a long is refused, never wrapped")
 	public void testThatPercentageTooLargeForLongIsRefused() {
@@ -211,6 +209,8 @@ public class EreachMoneyModuleTests {
 		// Then: The first returns the same amount; the second throws ArithmeticException
 		assertEquals(moneyBelowThreshold, resultBelowThreshold,
 				"The percentage of the amount just below the threshold should return the same amount");
+		assertEquals("long overflow", exceptionAboveThreshold.getMessage(),
+				"The percentage of the amount just above the threshold should throw an ArithmeticException with message 'long overflow'");
 	}
 
 	@Test
