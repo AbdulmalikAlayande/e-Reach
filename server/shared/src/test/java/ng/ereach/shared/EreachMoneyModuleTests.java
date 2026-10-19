@@ -155,8 +155,93 @@ public class EreachMoneyModuleTests {
 					"Patient and payer shares must add back to the original amount");
 		}
 	}
+	
+	@Test
+	@DisplayName("TC-004-18 | Money compares by value ")
+	public void testThatMoneyComparesByValue() {
+		// Given: Two `Money.ofKobo(100)` instances
+		Money money1 = Money.ofKobo(100);
+		Money money2 = Money.ofKobo(100);
+
+		// When: They are compared with `equals` and `hashCode`
+		boolean equals = money1.equals(money2);
+		int hashCode1 = money1.hashCode();
+		int hashCode2 = money2.hashCode();
+
+		// Then: They are equal with equal hash codes
+		assertTrue(equals, "Two Money instances with the same value should be equal");
+		assertEquals(hashCode1, hashCode2, "Two Money instances with the same value should have the same hash code");
+	}
+	
+	@Test
+	@DisplayName("TC-004-19 | No floating point near money")
+	public void testThatNoFloatingPointTypesAreUsedInMoney() {
+		// Given: The source code of the Money class
+		Path moneySourcePath = Path.of("src/main/java/ng/ereach/shared/money/Money.java");
+
+		try {
+			String moneySourceCode = Files.readString(moneySourcePath);
+
+			// When: Java code is checked for floating-point types, excluding comments
+			String javaCode = moneySourceCode
+					.replaceAll("(?s)/\\*.*?\\*/", "")
+					.replaceAll("(?m)//.*$", "");
+			boolean containsFloat = javaCode.matches("(?s).*\\bfloat\\b.*");
+			boolean containsDouble = javaCode.matches("(?s).*\\bdouble\\b.*");
+			boolean containsBigDecimal = javaCode.matches("(?s).*\\bBigDecimal\\b.*");
+
+			// Then: No `float`, `double`, or `BigDecimal` appears in any constructor, factory, or method signature, and the stored value is a `long`
+			assertFalse(containsFloat, "The Money class should not use float types");
+			assertFalse(containsDouble, "The Money class should not use double types");
+			assertFalse(containsBigDecimal, "The Money class should not use BigDecimal types");
+		} catch (IOException e) {
+			fail("Failed to read the Money source code: " + e.getMessage());
+		}
+	}
+	
+	//ID	Checks	Given	When	Then
+	// 		percentBps(10_000) is called on each	The first returns the same amount; the second throws ArithmeticException
+	@Test
+	@DisplayName("TC-004-20 | A percentage too large for a long is refused, never wrapped")
+	public void testThatPercentageTooLargeForLongIsRefused() {
+		// Given: Two Money instances, one just below and one just above the threshold for a long
+		Money moneyBelowThreshold = Money.ofKobo(922_337_203_685_477L);
+		Money moneyAboveThreshold = Money.ofKobo(922_337_203_685_478L);
+		
+		// When: percentBps(10_000) is called on each
+		Money resultBelowThreshold = moneyBelowThreshold.percentBps(10_000);
+		ArithmeticException exceptionAboveThreshold = assertThrows(ArithmeticException.class, () -> moneyAboveThreshold.percentBps(10_000));
+		
+		// Then: The first returns the same amount; the second throws ArithmeticException
+		assertEquals(moneyBelowThreshold, resultBelowThreshold,
+				"The percentage of the amount just below the threshold should return the same amount");
+		assertEquals("long overflow", exceptionAboveThreshold.getMessage(),
+				"The percentage of the amount just above the threshold should throw an ArithmeticException with 'long overflow' message");
+	}
+
+	@Test
+	@DisplayName("TC-004-21 | Money is immutable")
+	public void testThatMoneyIsImmutable() {
+		// Given: One Money instance whose value is observed before every operation
+		Money original = Money.ofKobo(100);
+
+		// When: Operations that produce different values are applied
+		Money sum = original.plus(Money.ofKobo(50));
+		assertEquals(100, original.kobo(), "plus must not change the original amount");
+
+		Money difference = original.minus(Money.ofKobo(20));
+		assertEquals(100, original.kobo(), "minus must not change the original amount");
+
+		Money half = original.percentBps(5_000);
+
+		// Then: Each result is correct and the original remains unchanged
+		assertEquals(Money.ofKobo(150), sum);
+		assertEquals(Money.ofKobo(80), difference);
+		assertEquals(Money.ofKobo(50), half);
+		assertEquals(Money.ofKobo(100), original,
+				"Percentage calculation must not change the original amount");
+		assertNotSame(original, sum, "plus must return a new Money instance");
+		assertNotSame(original, difference, "minus must return a new Money instance");
+		assertNotSame(original, half, "percentBps must return a new Money instance");
+	}
 }
-
-
-//| TC-004-18 | Money compares by value | Two `Money.ofKobo(100)` | They are compared with `equals` and `hashCode` | They are equal with equal hash codes | Unit | Rule 8 | Not written |
-//| TC-004-19 | No floating point near money | The source of `Money` | It is read in review | No `float`, `double` or `BigDecimal` appears in any constructor, factory or method signature, and the stored value is a `long` | Review | Rule 8 | Not written |
