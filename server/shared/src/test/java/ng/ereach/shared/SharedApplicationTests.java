@@ -39,6 +39,7 @@ public class SharedApplicationTests {
 	 * @since 0.0.1
 	 */
 	public static final Path PROJECT_ROOT_DIRECTORY = Path.of("").toAbsolutePath().getParent();
+
 	/**
 	 * Build and return a configured {@link ProcessBuilder} ready to execute the
 	 * Maven wrapper from the repository root.
@@ -146,7 +147,6 @@ public class SharedApplicationTests {
 			assertReactorListAllModules(consoleOutput);
 		} catch (Exception e) {
 			System.out.println(e.getMessage());
-			e.printStackTrace();
 			// Explicitly fail the JUnit test if an unexpected exception occurs
 			throw new AssertionError("Test interrupted due to process execution error", e);
 			
@@ -247,7 +247,6 @@ public class SharedApplicationTests {
 			assertTrue(foundUuidCreator, "Validation missing: uuid-creator was not found in the dependency tree.");
 		} catch (Exception e) {
 			System.out.println(e.getMessage());
-			e.printStackTrace();
 			throw new AssertionError("Test interrupted due to process execution error", e);
 			
 		}
