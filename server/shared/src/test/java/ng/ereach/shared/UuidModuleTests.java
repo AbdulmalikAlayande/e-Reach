@@ -1,9 +1,9 @@
 package ng.ereach.shared;
 
-import ng.ereach.shared.identity.FacilityId;
-import ng.ereach.shared.identity.Ids;
-import ng.ereach.shared.identity.PersonId;
-import ng.ereach.shared.identity.UserId;
+import ng.ereach.shared.id.FacilityId;
+import ng.ereach.shared.id.Ids;
+import ng.ereach.shared.id.PersonId;
+import ng.ereach.shared.id.UserId;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
