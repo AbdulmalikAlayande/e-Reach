@@ -11,6 +11,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DataSourceUtils;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.dao.DataAccessException;
+import org.springframework.jdbc.datasource.SingleConnectionDataSource;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import javax.sql.DataSource;
@@ -21,8 +22,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest
 public class FacilityIsolationTests extends PostgresIntegrationTest {
@@ -138,7 +138,6 @@ public class FacilityIsolationTests extends PostgresIntegrationTest {
 			} finally {
 				DataSourceUtils.releaseConnection(connection, dataSource);
 			}
-			
 			work.run();
 		});
 	}
@@ -164,18 +163,21 @@ public class FacilityIsolationTests extends PostgresIntegrationTest {
 	@DisplayName("TC-006-02 | An empty facility setting is treated as no facility and reads zero rows")
 	void testThatAnEmptyFacilitySettingIsTreatedAsMissingAndReturnsZeroRows() {
 		// Given: app.facility_id set to the empty text ''
-		appUsingDatabaseTables.execute("SELECT set_config('app.facility_id', '', true)");
 		
-		// When: clinic and facility_setting are counted
-		String clinicsSqlQuery = "SELECT COUNT(*) FROM clinic as f";
-		String facilitySettingsSqlQuery = "SELECT COUNT(*) FROM facility_setting as fs";
-		
-		Long clinics = appUsingDatabaseTables.queryForObject(clinicsSqlQuery, Long.class);
-		Long facilitySettings = appUsingDatabaseTables.queryForObject(facilitySettingsSqlQuery, Long.class);
-		
-		// Then: Both counts are 0
-		assertEquals(0, clinics);
-		assertEquals(0, facilitySettings);
+		transaction.executeWithoutResult(_ -> {
+			appUsingDatabaseTables.queryForObject("SELECT set_config('app.facility_id', ?, true)", String.class, "");
+			
+			// When: clinic and facility_setting are counted
+			String clinicsSqlQuery = "SELECT COUNT(*) FROM clinic as f";
+			String facilitySettingsSqlQuery = "SELECT COUNT(*) FROM facility_setting as fs";
+			
+			Long clinics = appUsingDatabaseTables.queryForObject(clinicsSqlQuery, Long.class);
+			Long facilitySettings = appUsingDatabaseTables.queryForObject(facilitySettingsSqlQuery, Long.class);
+			
+			// Then: Both counts are 0
+			assertEquals(0, clinics);
+			assertEquals(0, facilitySettings);
+		});
 	}
 	
 	@Test
@@ -224,16 +226,19 @@ public class FacilityIsolationTests extends PostgresIntegrationTest {
 	@Test
 	@DisplayName("TC-006-04 | A facility ID that belongs to no facility reads zero clinics")
 	void testThatAFacilityIdWithNoMatchingFacilityReadsZeroClinics() {
-		// Given: app.facility_id set to a UUID that no facility has
-		UUID nonExistentId = Ids.newId();
-		appUsingDatabaseTables.execute("SELECT set_config('app.facility_id', '" + nonExistentId + "',true)");
 		
-		// When: clinics are counted
-		String clinicsSqlQuery = "SELECT COUNT(*) FROM clinic as f";
-		Long clinics = appUsingDatabaseTables.queryForObject(clinicsSqlQuery, Long.class);
-		
-		// Then: The count is 0
-		assertEquals(0L, clinics, "Non Existent Id should cause the query to return 0 rows");
+		transaction.executeWithoutResult(_ -> {
+			// Given: app.facility_id set to a UUID that no facility has
+			UUID nonExistentId = Ids.newId();
+			appUsingDatabaseTables.queryForObject("SELECT set_config('app.facility_id', ? ,true)", String.class , nonExistentId.toString());
+			
+			// When: clinics are counted
+			String clinicsSqlQuery = "SELECT COUNT(*) FROM clinic as f";
+			Long clinics = appUsingDatabaseTables.queryForObject(clinicsSqlQuery, Long.class);
+			
+			// Then: The count is 0
+			assertEquals(0L, clinics, "Non Existent Id should cause the query to return 0 rows");
+		});
 	}
 	
 	@Test
@@ -249,29 +254,25 @@ public class FacilityIsolationTests extends PostgresIntegrationTest {
 	@Test
 	@DisplayName("TC-006-06 | The facility setting ends at commit, so a reused connection sees nothing after")
 	void testThatTheFacilitySettingEndsWithTheTransactionSoTheSameConnectionSeesZeroRowsAfterCommit() {
+		DataSource dataSource = Objects.requireNonNull(appUsingDatabaseTables.getDataSource());
 		// Given: One connection: A set, clinics counted, transaction committed
-		transaction.executeWithoutResult(_ -> {
-			appUsingDatabaseTables.queryForObject(
-					"SELECT set_config('app.facility_id', ?, true)",
-					String.class,
-					noviaHospitalId.toString());
-
-			Long clinics = appUsingDatabaseTables.queryForObject(
-					"SELECT COUNT(*) FROM clinic",
-					Long.class);
-
-			// When: clinics are counted inside the transaction
+		try (Connection connection = dataSource.getConnection()) {
+			JdbcTemplate oneConnection = new JdbcTemplate(new SingleConnectionDataSource(connection, true));
+			
+			connection.setAutoCommit(false);
+			oneConnection.queryForObject("SELECT set_config('app.facility_id', ?, true)", String.class, noviaHospitalId.toString());
+			// When: clinics are counted inside the transaction before commit
 			// Then: 2 inside the transaction
-			assertEquals(2L, clinics);
-		});
-
-		// When: clinics are counted again on the same connection after commit
-		Long clinicsAfterCommit = appUsingDatabaseTables.queryForObject(
-				"SELECT COUNT(*) FROM clinic",
-				Long.class);
-
-		// Then: 0 after it
-		assertEquals(0L, clinicsAfterCommit);
+			assertEquals(2L, oneConnection.queryForObject("SELECT COUNT(*) FROM clinic", Long.class));
+			connection.commit();
+			
+			connection.setAutoCommit(true);
+			// When: clinics are counted again on the same connection after commit
+			// Then: 0 after it
+			assertEquals(0L, oneConnection.queryForObject("SELECT COUNT(*) FROM clinic", Long.class));
+		}catch (SQLException exception){
+			throw new RuntimeException(exception);
+		}
 	}
 	
 	@Test
@@ -351,7 +352,7 @@ public class FacilityIsolationTests extends PostgresIntegrationTest {
 	}
 	
 	@Test
-	@DisplayName("TC-006-10 | Facility A updating B's clinic by its exact ID changes 0 rows and B's data stays")
+	@DisplayName("TC-006-10 | A facility updating another facility's clinic by its exact ID changes 0 rows and the facility's data stays")
 	void testThatFacilityAUpdatingFacilityBClinicByIdChangesZeroRowsAndLeavesItUnchanged() {
 		// Given: A set
 		record ClinicReference(UUID id, String name) {}
@@ -399,11 +400,20 @@ public class FacilityIsolationTests extends PostgresIntegrationTest {
 	@Test
 	@DisplayName("TC-006-11 | The app cannot hard-delete clinics; DELETE is refused with permission denied")
 	void testThatTheApplicationRoleCannotHardDeleteClinicsAndGetsPermissionDenied() {
-		// Given: A set
-		
-		// When: DELETE FROM clinic runs
-		
-		// Then: Refused: permission denied for table clinic
+		transaction.executeWithoutResult(_ -> {
+			// Given: A facility settings is made
+			appUsingDatabaseTables.queryForObject("SELECT set_config('app.facility_id', ?, true)", String.class, unilagMedicalCenterId.toString());
+			
+			// When: The facility runs a `DELETE FROM clinic` query
+			DataAccessException dae = assertThrows(DataAccessException.class,
+					() -> appUsingDatabaseTables.update("DELETE FROM clinic"));
+			
+			SQLException sqlException = (SQLException) dae.getMostSpecificCause();
+			
+			// Then: The database refuses the query with "permission denied for table clinic"
+			assertEquals("42501", sqlException.getSQLState(),
+					"The delete should be refused because the app has no DELETE permission on clinic");
+		});
 	}
 	
 	@Test
@@ -412,8 +422,10 @@ public class FacilityIsolationTests extends PostgresIntegrationTest {
 		// Given: Connected as ereach_owner, no facility set
 		
 		// When: clinics are counted
+		Long clinics = databaseTableOwner.queryForObject("SELECT COUNT(*) FROM clinic", Long.class);
 		
 		// Then: The count is 0, because the tables are forced
+		assertEquals(0L, clinics, "The owner must see no clinics when no facility is set");
 	}
 	
 	@Test
@@ -422,7 +434,32 @@ public class FacilityIsolationTests extends PostgresIntegrationTest {
 		// Given: The migrated schema
 		
 		// When: the catalogue is read: every table in public with a facility_id column
+		List<String> facilityTables = databaseTableOwner.queryForList("""
+				SELECT c.relname
+				FROM pg_class c
+				JOIN pg_namespace n ON n.oid = c.relnamespace
+				WHERE n.nspname = 'public'
+				  AND c.relkind = 'r'
+				  AND EXISTS (SELECT 1 FROM pg_attribute a
+				              WHERE a.attrelid = c.oid AND a.attname = 'facility_id' AND NOT a.attisdropped)
+				ORDER BY c.relname
+				""", String.class);
+		List<String> unguardedTables = databaseTableOwner.queryForList("""
+				SELECT c.relname
+				FROM pg_class c
+				JOIN pg_namespace n ON n.oid = c.relnamespace
+				WHERE n.nspname = 'public'
+				  AND c.relkind = 'r'
+				  AND EXISTS (SELECT 1 FROM pg_attribute a
+				              WHERE a.attrelid = c.oid AND a.attname = 'facility_id' AND NOT a.attisdropped)
+				  AND (NOT c.relrowsecurity
+				       OR NOT c.relforcerowsecurity
+				       OR NOT EXISTS (SELECT 1 FROM pg_policy p WHERE p.polrelid = c.oid))
+				ORDER BY c.relname
+				""", String.class);
 		
 		// Then: Each one has row-level security enabled and forced and at least one policy; the list of offenders is empty
+		assertTrue(facilityTables.containsAll(List.of("clinic", "facility_setting")));
+		assertEquals(List.of(), unguardedTables);
 	}
 }
