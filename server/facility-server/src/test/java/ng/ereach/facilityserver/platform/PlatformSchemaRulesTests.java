@@ -1,5 +1,6 @@
-package ng.ereach.facilityserver;
+package ng.ereach.facilityserver.platform;
 
+import ng.ereach.facilityserver.PostgresIntegrationTest;
 import ng.ereach.shared.id.Ids;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;

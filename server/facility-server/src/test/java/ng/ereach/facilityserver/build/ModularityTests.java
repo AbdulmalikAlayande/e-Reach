@@ -1,5 +1,6 @@
-package ng.ereach.facilityserver;
+package ng.ereach.facilityserver.build;
 
+import ng.ereach.facilityserver.FacilityServerApplication;
 import org.junit.jupiter.api.Test;
 import org.springframework.modulith.core.ApplicationModules;
 
