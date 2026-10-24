@@ -1,5 +1,6 @@
 package ng.ereach.facilityserver.platform;
 
+import jakarta.persistence.EntityManagerFactory;
 import ng.ereach.facilityserver.PostgresIntegrationTest;
 import ng.ereach.shared.id.Ids;
 import org.junit.jupiter.api.BeforeEach;
@@ -13,6 +14,7 @@ import org.springframework.jdbc.datasource.DataSourceUtils;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.datasource.SingleConnectionDataSource;
+import org.springframework.orm.jpa.JpaTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import javax.sql.DataSource;
@@ -33,6 +35,8 @@ public class FacilityIsolationTests extends PostgresIntegrationTest {
 	
 	@Autowired
 	TransactionTemplate transaction;
+	@Autowired
+	EntityManagerFactory entityManagerFactory;
 	
 	JdbcTemplate databaseTableOwner;
 	
@@ -43,14 +47,16 @@ public class FacilityIsolationTests extends PostgresIntegrationTest {
 	UUID unilagMedicalCenterId;
 	UUID otaGeneralHospitalId;
 	UUID noviaHospitalId;
+	UUID userId;
 	
 	@BeforeEach
 	public void configureDatabaseAccess(){
+		transaction = new TransactionTemplate(new JpaTransactionManager(entityManagerFactory));
 		databaseTableOwner = new JdbcTemplate(new DriverManagerDataSource(databaseUrl, "ereach_owner", "ereach_owner"));
 		
 		databaseTableOwner.execute("TRUNCATE facility_setting, clinic, facility, lga, state");
 		databaseTableOwner.update("INSERT INTO state (code, name) VALUES ('LA', 'Lagos'), ('OG', 'Ogun')");
-		 databaseTableOwner.update("""
+		databaseTableOwner.update("""
 			INSERT INTO lga (code, state_code, name)
 			VALUES
 			 	('LA-ALM', 'LA', 'Alimosho'),
@@ -59,6 +65,7 @@ public class FacilityIsolationTests extends PostgresIntegrationTest {
 			    ('OG-YWN', 'OG', 'Yewa North')
 		""");
 		
+		userId = Ids.newId();
 		primexHospitalId = Ids.newId();
 		unilagMedicalCenterId = Ids.newId();
 		otaGeneralHospitalId = Ids.newId();
@@ -128,7 +135,6 @@ public class FacilityIsolationTests extends PostgresIntegrationTest {
 	
 	private void indicateFacilityIdentity(UUID facilityId, Runnable work) {
 		transaction.executeWithoutResult(_ -> {
-			
 			DataSource dataSource = Objects.requireNonNull(appUsingDatabaseTables.getDataSource());
 			Connection connection = DataSourceUtils.getConnection(dataSource);
 			
@@ -282,25 +288,20 @@ public class FacilityIsolationTests extends PostgresIntegrationTest {
 		// Given: A set
 
 		DataAccessException exception = assertThrows(DataAccessException.class, () ->
-				transaction.executeWithoutResult(_ -> {
-					appUsingDatabaseTables.queryForObject(
-							"SELECT set_config('app.facility_id', ?, true)",
-							String.class,
-							primexHospitalId.toString());
+			transaction.executeWithoutResult(_ -> {
+				appUsingDatabaseTables.queryForObject("SELECT set_config('app.facility_id', ?, true)", String.class,
+					primexHospitalId.toString());
 
-					// When: a clinic stamped with B is inserted
-					appUsingDatabaseTables.update("""
-							INSERT INTO clinic (id, facility_id, code, name)
-							VALUES (?, ?, 'NEW', 'New Unilag Clinic')
-							""",
-							Ids.newId(),
-							unilagMedicalCenterId);
-				}));
+				// When: a clinic stamped with B is inserted
+				appUsingDatabaseTables.update("""
+					INSERT INTO clinic (id, facility_id, code, name) VALUES (?, ?, 'NEW', 'New Unilag Clinic')
+					""", Ids.newId(), unilagMedicalCenterId);
+			}));
 
-				// Then: Refused: new row violates row-level security policy
-				SQLException sqlException = (SQLException) exception.getMostSpecificCause();
-				assertEquals("42501", sqlException.getSQLState(),
-						"The insert should be refused with PostgreSQL's insufficient-privilege SQL state");
+			// Then: Refused: new row violates row-level security policy
+			SQLException sqlException = (SQLException) exception.getMostSpecificCause();
+			assertEquals("42501", sqlException.getSQLState(),
+					"The insert should be refused with PostgreSQL's insufficient-privilege SQL state");
 	}
 	
 	@Test
