@@ -16,8 +16,11 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import javax.sql.DataSource;
+import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -291,15 +294,13 @@ public class TransactionContextHookTest extends PostgresIntegrationTest {
 			UUID newClinicId = Ids.newId();
 			
 			// 1. When a transaction inserts a new clinic for A
-			FacilityContext.runWithContext(contextA, () -> transaction.executeWithoutResult(_ -> {
-				jdbcTemplate.update("""
-					INSERT INTO clinic (id, facility_id, code, name) VALUES (?, ?, ?, ?)
-				""", newClinicId, primexHospitalId.uuid(), "PAED", "Pediatrics Clinic");
-			}));
+			FacilityContext.runWithContext(contextA, () -> transaction.executeWithoutResult(_ -> jdbcTemplate.update("""
+				INSERT INTO clinic (id, facility_id, code, name) VALUES (?, ?, ?, ?)
+			""", newClinicId, primexHospitalId.uuid(), "PAED", "Pediatrics Clinic")));
 			
 			// 2. Then a later read in facility A finds it
 			FacilityContext.runWithContext(contextA, () -> transaction.executeWithoutResult(_ -> {
-				int count = jdbcTemplate.queryForObject(
+				Integer count = jdbcTemplate.queryForObject(
 						"SELECT COUNT(*) FROM clinic WHERE id = ?", Integer.class, newClinicId
 				);
 				assertEquals(1, count, "The newly inserted clinic should be visible under Facility A's context");
@@ -313,14 +314,11 @@ public class TransactionContextHookTest extends PostgresIntegrationTest {
 			UUID newClinicId = Ids.newId();
 			
 			// When a transaction inserts a clinic stamped with facility B
-			org.springframework.dao.DataAccessException exception = assertThrows(
-					org.springframework.dao.DataAccessException.class,
-					() -> FacilityContext.runWithContext(contextA, () -> transaction.executeWithoutResult(_ -> {
-						jdbcTemplate.update("""
-						INSERT INTO clinic (id, facility_id, code, name) VALUES (?, ?, ?, ?)
-					""", newClinicId, noviaHospitalId.uuid(), "PAED", "Malicious Cross Facility Insert");
-					}))
-			);
+			DataAccessException exception = assertThrows(DataAccessException.class, () -> FacilityContext.runWithContext(
+				contextA, () -> transaction.executeWithoutResult(_ -> jdbcTemplate.update("""
+					INSERT INTO clinic (id, facility_id, code, name) VALUES (?, ?, ?, ?)
+				""", newClinicId, noviaHospitalId.uuid(), "PAED", "Malicious Cross Facility Insert"))
+			));
 			
 			// Then it fails with SQLState 42501 (Insufficient Privilege due to WITH CHECK policy)
 			java.sql.SQLException sqlException = (java.sql.SQLException) exception.getMostSpecificCause();
@@ -333,15 +331,12 @@ public class TransactionContextHookTest extends PostgresIntegrationTest {
 			FacilityContext contextA = FacilityContext.forFacility(primexHospitalId, currentUserId);
 			
 			// When a transaction changes an existing Facility A clinic's facility_id to B
-			org.springframework.dao.DataAccessException exception = assertThrows(
-					org.springframework.dao.DataAccessException.class,
-					() -> FacilityContext.runWithContext(contextA, () -> transaction.executeWithoutResult(_ -> {
-						jdbcTemplate.update("""
-						UPDATE clinic
-						SET facility_id = ?
-						WHERE facility_id = ? AND code = ?
-					""", noviaHospitalId.uuid(), primexHospitalId.uuid(), "ORTHO/OOPD");
-					}))
+			DataAccessException exception = assertThrows(DataAccessException.class, () -> FacilityContext.runWithContext(
+				contextA, () -> transaction.executeWithoutResult(_ -> jdbcTemplate.update("""
+					UPDATE clinic
+					SET facility_id = ?
+					WHERE facility_id = ? AND code = ?
+				""", noviaHospitalId.uuid(), primexHospitalId.uuid(), "ORTHO/OOPD")))
 			);
 			
 			// Then it fails with SQLState 42501 (WITH CHECK constraint prevents mutating the tenant discriminator column)
@@ -349,9 +344,6 @@ public class TransactionContextHookTest extends PostgresIntegrationTest {
 			assertEquals("42501", sqlException.getSQLState(), "Expected an RLS policy mutation check violation (42501)");
 		}
 		
-		
-		// This shit fails with: "ERROR: permission denied for table clinic", I mean, are we even supposed to be
-		// altering tables as the app (ereach_app) and not as the owner (ereach_owner)?
 		@Test
 		@DisplayName("TC-006-40 | Given context A, updates to B affect 0 rows, and hard deletes are explicitly refused with a 42501 permission error")
 		void _____________() {
@@ -370,11 +362,9 @@ public class TransactionContextHookTest extends PostgresIntegrationTest {
 			// 2. Verify that hard deletes are fundamentally refused by the database schema permissions
 			org.springframework.dao.DataAccessException exception = assertThrows(
 					org.springframework.dao.DataAccessException.class,
-					() -> FacilityContext.runWithContext(contextA, () -> transaction.executeWithoutResult(_ -> {
-						jdbcTemplate.update("""
-						DELETE FROM clinic WHERE facility_id = ? AND code = ?
-					""", noviaHospitalId.uuid(), "PSYCH/MH");
-					}))
+					() -> FacilityContext.runWithContext(contextA, () -> transaction.executeWithoutResult(_ -> jdbcTemplate.update("""
+					DELETE FROM clinic WHERE facility_id = ? AND code = ?
+				""", noviaHospitalId.uuid(), "PSYCH/MH")))
 			);
 			
 			// Assert that the delete failure is due to explicit missing DML permissions (SQLState 42501)
@@ -388,6 +378,107 @@ public class TransactionContextHookTest extends PostgresIntegrationTest {
 				""", String.class, noviaHospitalId.uuid(), "PSYCH/MH");
 				
 				assertEquals("Novia Psychiatry/Mental Health Clinic", currentName, "The record must remain pristine and unchanged.");
+			}));
+		}
+	}
+	
+	@Nested
+	@DisplayName("Tests Against Leaks Between Transactions")
+	class TestsAgainstLeaksBetweenTransactions {
+		
+		@Test
+		@DisplayName("TC-006-41 | Given a transaction with facility A has committed, when the next transaction runs with no context, then session parameters are cleared and clinics return zero rows")
+		void __(){
+			// Given a transaction with Primex Hospital (facility A) has committed.
+			FacilityContext contextA = new FacilityContext(primexHospitalId, currentUserId);
+			FacilityContext.runWithContext(contextA, () -> transaction.executeWithoutResult(_ -> {
+				// Run a query to ensure context is pushed to the connection
+				jdbcTemplate.execute("SELECT 1");
+			}));
+			
+			// When the next transaction runs with no context.
+			transaction.executeWithoutResult(_ -> {
+				String actualFacilityId = jdbcTemplate.queryForObject("SELECT current_setting('app.facility_id', true)", String.class);
+				Integer visibleClinicsCount = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM clinic", Integer.class);
+				
+				// Then app.facility_id is empty/null and clinics return zero rows.
+				assertTrue(actualFacilityId == null || actualFacilityId.isBlank(), "The facility context should not leak into the next transaction");
+				assertEquals(0, visibleClinicsCount, "No rows should be returned from an unbound transaction context");
+			});
+		}
+		
+		@Test
+		@DisplayName("TC-006-42 | Given a transaction with facility A rolled back after an exception, when the next transaction runs with no context, then app.facility_id is empty")
+		void ___(){
+			// Given a transaction with facility A rolled back after an exception.
+			FacilityContext contextA = new FacilityContext(primexHospitalId, currentUserId);
+			try {
+				FacilityContext.runWithContext(contextA, () -> transaction.executeWithoutResult(_ -> {
+					jdbcTemplate.execute("SELECT 1");
+					throw new RuntimeException("Simulated application failure to force structural rollback");
+				}));
+			} catch (Exception ignored) {
+				// Exception is swallowed deliberately to allow checking the sequential transaction flow
+			}
+			
+			// When the next transaction runs with no context.
+			transaction.executeWithoutResult(_ -> {
+				String actualFacilityId = jdbcTemplate.queryForObject("SELECT current_setting('app.facility_id', true)", String.class);
+				
+				// Then app.facility_id is empty.
+				assertTrue(actualFacilityId == null || actualFacilityId.isBlank(), "The transaction session context must not leak after an explicit database rollback");
+			});
+		}
+		
+		@Test
+		@DisplayName("TC-006-43 | Given a transaction with facility A has finished, when the next transaction runs with facility B, then only facility B rows come back")
+		void ____(){
+			record ClinicRow(UUID facilityId, String code, String name) {}
+			
+			// Given a transaction with facility A has finished.
+			FacilityContext contextA = new FacilityContext(primexHospitalId, currentUserId);
+			FacilityContext.runWithContext(contextA, () -> transaction.executeWithoutResult(_ -> {
+				jdbcTemplate.execute("SELECT 1");
+			}));
+			
+			// When the next transaction runs with facility B (Novia Hospital).
+			FacilityContext contextB = new FacilityContext(noviaHospitalId, currentUserId);
+			FacilityContext.runWithContext(contextB, () -> transaction.executeWithoutResult(_ -> {
+				String sqlQuery = """
+					SELECT facility_id, code, name
+					FROM clinic
+					ORDER BY code
+				""";
+				List<ClinicRow> clinics = jdbcTemplate.query(sqlQuery, (resultSet, _) -> new ClinicRow(
+						resultSet.getObject("facility_id", UUID.class),
+						resultSet.getString("code"),
+						resultSet.getString("name")
+				));
+				
+				// Then only Novia's rows sort and come back cleanly (Alphabetical: DENT, then PSYCH/MH)
+				assertEquals(List.of(
+						new ClinicRow(noviaHospitalId.uuid(), "DENT", "Novia Dental Clinic"),
+						new ClinicRow(noviaHospitalId.uuid(), "PSYCH/MH", "Novia Psychiatry/Mental Health Clinic")
+				), clinics, "The transaction must only yield rows corresponding to the active context binding");
+			}));
+		}
+		
+		@Test
+		@DisplayName("TC-006-44 | Given a transaction with user U has finished, when the next transaction runs with no user context, then app.user_id evaluates to empty")
+		void _____(){
+			// Given a transaction with user U has finished.
+			FacilityContext contextWithUser = new FacilityContext(primexHospitalId, currentUserId);
+			FacilityContext.runWithContext(contextWithUser,
+					() -> transaction.executeWithoutResult(_ -> jdbcTemplate.execute("SELECT 1")));
+			
+			// When the next transaction runs with no user context active.
+			FacilityContext contextNoUser = new FacilityContext(primexHospitalId, null);
+			FacilityContext.runWithContext(contextNoUser, () -> transaction.executeWithoutResult(_ -> {
+				String actualUserId = jdbcTemplate.queryForObject("SELECT current_setting('app.user_id', true)", String.class);
+				
+				// Then app.user_id is empty or null.
+				assertTrue(actualUserId == null || actualUserId.isBlank(),
+						"User configurations from prior sessions should not poison current unauthenticated scopes");
 			}));
 		}
 	}
