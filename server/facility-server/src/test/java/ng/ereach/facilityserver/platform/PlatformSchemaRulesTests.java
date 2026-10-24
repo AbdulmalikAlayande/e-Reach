@@ -212,7 +212,7 @@ class PlatformSchemaRulesTests extends PostgresIntegrationTest {
 	}
 
 	private int countClinics(UUID facilityId, String code) {
-		return transaction.execute(status -> {
+		return transaction.execute(_ -> {
 			database.queryForObject("SELECT set_config('app.facility_id', ?, true)", String.class, facilityId.toString());
 			return database.queryForObject("SELECT COUNT(*) FROM clinic WHERE code = ?", Integer.class, code);
 		});
