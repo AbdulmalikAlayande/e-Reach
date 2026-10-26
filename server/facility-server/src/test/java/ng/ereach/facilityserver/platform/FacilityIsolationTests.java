@@ -72,64 +72,75 @@ public class FacilityIsolationTests extends PostgresIntegrationTest {
 		noviaHospitalId = Ids.newId();
 		
 		appUsingDatabaseTables.update("""
-			INSERT INTO facility (id, name, type, state_code, lga_code, hospital_number_prefix, nhfr_code)
-			VALUES
-			    (?, 'Primex Hospital', 'secondary', 'LA', 'LA-ALM', 'AH', 'NG-01515'),
-			    (?, 'Unilag Medical Center', 'secondary', 'LA', 'LA-YAB', 'GH', 'NG-34122'),
-			    (?, 'Ota General Hospital', 'primary', 'OG', 'OG-ODT', 'PB', 'NG-024497'),
-			    (?, 'Novia Hospital', 'secondary', 'OG', 'OG-YWN', 'FT', 'NG-97762')
-		""", primexHospitalId, unilagMedicalCenterId, otaGeneralHospitalId, noviaHospitalId);
+			INSERT INTO facility (id, name, type, state_code, lga_code, hospital_number_prefix, nhfr_code, created_by, updated_by)
+			VALUES (?, 'Primex Hospital', 'clinic', 'LA', 'LA-ALM', 'AH', 'NG-01515', ?, ?)
+		""", primexHospitalId, userId, userId);
+		
+		appUsingDatabaseTables.update("""
+			INSERT INTO facility (id, name, type, state_code, lga_code, hospital_number_prefix, nhfr_code, created_by, updated_by)
+			VALUES (?, 'Unilag Medical Center', 'clinic', 'LA', 'LA-YAB', 'GH', 'NG-34122', ?, ?)
+		""", unilagMedicalCenterId, userId, userId);
+		
+		appUsingDatabaseTables.update("""
+			INSERT INTO facility (id, name, type, state_code, lga_code, hospital_number_prefix, nhfr_code, created_by, updated_by)
+			VALUES (?, 'Ota General Hospital', 'secondary', 'OG', 'OG-ODT', 'PB', 'NG-024497', ?, ?)
+		""", otaGeneralHospitalId, userId, userId);
+		
+		appUsingDatabaseTables.update("""
+			INSERT INTO facility (id, name, type, state_code, lga_code, hospital_number_prefix, nhfr_code, created_by, updated_by)
+			VALUES (?, 'Novia Hospital', 'secondary', 'OG', 'OG-YWN', 'FT', 'NG-97762', ?, ?)
+		""", noviaHospitalId, userId, userId);
 		
 		indicateFacilityIdentity(primexHospitalId, () -> {
 			appUsingDatabaseTables.update("""
-   				INSERT INTO facility_setting (id, facility_id, key_, value_)
-   				VALUES (?, ?, 'lab.verification_required', 'true'::jsonb)
-   			""", Ids.newId(), primexHospitalId);
+   				INSERT INTO facility_setting (id, facility_id, key, value, created_by, updated_by)
+   				VALUES (?, ?, 'lab.verification_required', 'true'::jsonb, ?, ?)
+   			""", Ids.newId(), primexHospitalId, userId, userId);
 			appUsingDatabaseTables.update("""
-				INSERT INTO clinic (id, facility_id, code, name) VALUES (?, ?, 'GOPD', 'GOPD Primex')
-			""", Ids.newId(), primexHospitalId);
+				INSERT INTO clinic (id, facility_id, code, name, created_by, updated_by) VALUES (?, ?, 'GOPD', 'GOPD Primex', ?, ?)
+			""", Ids.newId(), primexHospitalId, userId, userId);
 			appUsingDatabaseTables.update("""
-				INSERT INTO clinic (id, facility_id, code, name) VALUES (?, ?, 'ANC', 'ANC Primex')
-			""", Ids.newId(), primexHospitalId);
+				INSERT INTO clinic (id, facility_id, code, name, created_by, updated_by) VALUES (?, ?, 'ANC', 'ANC Primex', ?, ?)
+			""", Ids.newId(), primexHospitalId, userId, userId);
 		});
 		
 		indicateFacilityIdentity(unilagMedicalCenterId, () -> {
 			appUsingDatabaseTables.update("""
-				INSERT INTO clinic (id, facility_id, code, name) VALUES (?, ?, 'PAED', 'PAED Unilag Medical Centre')
-			""", Ids.newId(), unilagMedicalCenterId);
+				INSERT INTO clinic (id, facility_id, code, name, created_by, updated_by) VALUES (?, ?, 'PAED', 'PAED Unilag Medical Centre', ?, ?)
+			""", Ids.newId(), unilagMedicalCenterId, userId, userId);
 			appUsingDatabaseTables.update("""
-				INSERT INTO clinic (id, facility_id, code, name) VALUES  (?, ?, 'MOPD', 'MOPD Unilag Medical Centre')
-			""", Ids.newId(), unilagMedicalCenterId);
+				INSERT INTO clinic (id, facility_id, code, name, created_by, updated_by) VALUES  (?, ?, 'MOPD', 'MOPD Unilag Medical Centre', ?, ?)
+			""", Ids.newId(), unilagMedicalCenterId, userId, userId);
 			appUsingDatabaseTables.update("""
-				INSERT INTO facility_setting (id, facility_id, key_, value_)
-				VALUES (?, ?, 'lab.verification_required', 'false'::jsonb)
-			""", Ids.newId(), unilagMedicalCenterId);
+				INSERT INTO facility_setting (id, facility_id, key, value, created_by, updated_by)
+				VALUES (?, ?, 'lab.verification_required', 'false'::jsonb, ?, ?)
+			""", Ids.newId(), unilagMedicalCenterId, userId, userId);
 		});
 		
 		indicateFacilityIdentity(otaGeneralHospitalId, () -> {
 			appUsingDatabaseTables.update("""
-				INSERT INTO clinic (id, facility_id, code, name) VALUES (?, ?, 'ORTHO/OOPD', 'Orthopedic Outpatient Department')
-			""", Ids.newId(), otaGeneralHospitalId);
+				INSERT INTO clinic (id, facility_id, code, name, created_by, updated_by) VALUES (?, ?, 'ORTHO', 'Orthopedic Outpatient Department', ?, ?)
+			""", Ids.newId(), otaGeneralHospitalId, userId, userId);
 			appUsingDatabaseTables.update("""
-				INSERT INTO clinic (id, facility_id, code, name) VALUES  (?, ?, 'CARD', 'Cardiology Clinic Ota')
-			""", Ids.newId(),  otaGeneralHospitalId);
+				INSERT INTO clinic (id, facility_id, code, name, created_by, updated_by) VALUES  (?, ?, 'CARD', 'Cardiology Clinic Ota', ?, ?)
+			""", Ids.newId(),  otaGeneralHospitalId, userId, userId);
 			appUsingDatabaseTables.update("""
-				INSERT INTO facility_setting (id, facility_id, key_, value_)
-				VALUES (?, ?, 'lab.verification_required', 'false'::jsonb)
-			""", Ids.newId(), otaGeneralHospitalId);
+				INSERT INTO facility_setting (id, facility_id, key, value, created_by, updated_by)
+				VALUES (?, ?, 'lab.verification_required', 'false'::jsonb, ?, ?)
+			""", Ids.newId(), otaGeneralHospitalId, userId, userId);
 		});
 		
 		indicateFacilityIdentity(noviaHospitalId, () -> {
 			appUsingDatabaseTables.update("""
-				INSERT INTO clinic (id, facility_id, code, name) VALUES (?, ?, 'PSYCH/MH', 'Novia Psychiatry/Mental Health Clinic')
-			""", Ids.newId(), noviaHospitalId);
+				INSERT INTO clinic (id, facility_id, code, name, created_by, updated_by) VALUES (?, ?, 'PSYCH', 'Novia Psychiatry/Mental Health Clinic', ?, ?)
+			""", Ids.newId(), noviaHospitalId, userId, userId);
 			appUsingDatabaseTables.update("""
-				INSERT INTO clinic (id, facility_id, code, name) VALUES  (?, ?, 'DENT', 'Novia Dental Clinic')
-			""", Ids.newId(),  noviaHospitalId);
+				INSERT INTO clinic (id, facility_id, code, name, created_by, updated_by) VALUES  (?, ?, 'DENT', 'Novia Dental Clinic', ?, ?)
+			""", Ids.newId(),  noviaHospitalId, userId, userId);
 			appUsingDatabaseTables.update("""
-				INSERT INTO facility_setting (id, facility_id, key_, value_)
-				VALUES (?, ?, 'lab.verification_required', 'false'::jsonb)
-			""", Ids.newId(), noviaHospitalId);
+				INSERT INTO facility_setting (id, facility_id, key, value, created_by, updated_by)
+				VALUES (?, ?, 'lab.verification_required', 'false'::jsonb, ?, ?)
+			""", Ids.newId(), noviaHospitalId, userId, userId);
 		});
 	}
 	
@@ -209,12 +220,12 @@ public class FacilityIsolationTests extends PostgresIntegrationTest {
 					resultSet.getString("name")));
 			
 			List<SettingRow> settings = appUsingDatabaseTables.query("""
-				SELECT key_, value_::text AS value
+				SELECT key, value::text AS value
 				FROM facility_setting
-				ORDER BY key_
+				ORDER BY key
 				""",
 				(resultSet, _) -> new SettingRow(
-					resultSet.getString("key_"),
+					resultSet.getString("key"),
 					resultSet.getString("value")));
 
 			return new VisibleRows(clinics, settings);
@@ -294,8 +305,8 @@ public class FacilityIsolationTests extends PostgresIntegrationTest {
 
 				// When: a clinic stamped with B is inserted
 				appUsingDatabaseTables.update("""
-					INSERT INTO clinic (id, facility_id, code, name) VALUES (?, ?, 'NEW', 'New Unilag Clinic')
-					""", Ids.newId(), unilagMedicalCenterId);
+					INSERT INTO clinic (id, facility_id, code, name, created_by, updated_by) VALUES (?, ?, 'NEW', 'New Unilag Clinic', ?, ?)
+					""", Ids.newId(), unilagMedicalCenterId, userId, userId);
 			}));
 
 			// Then: Refused: new row violates row-level security policy
@@ -312,11 +323,9 @@ public class FacilityIsolationTests extends PostgresIntegrationTest {
 				transaction.executeWithoutResult(_ -> {
 					// When: a clinic stamped with A is inserted
 					appUsingDatabaseTables.update("""
-							INSERT INTO clinic (id, facility_id, code, name)
-							VALUES (?, ?, 'NEW', 'New Primex Clinic')
-							""",
-							Ids.newId(),
-							primexHospitalId);
+							INSERT INTO clinic (id, facility_id, code, name, created_by, updated_by)
+							VALUES (?, ?, 'NEW', 'New Primex Clinic', ?, ?)
+							""", Ids.newId(), primexHospitalId, userId, userId);
 				}));
 
 		// Then: Refused: new row violates row-level security policy
