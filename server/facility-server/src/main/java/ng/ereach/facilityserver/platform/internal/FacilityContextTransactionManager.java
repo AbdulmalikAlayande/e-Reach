@@ -27,7 +27,7 @@ import java.sql.SQLException;
  */
 public class FacilityContextTransactionManager extends JpaTransactionManager {
 	
-	private static final String APPLY_CONTEXT_SQL = """
+	private static final String CONTEXT_SQL_QUERY = """
 		SELECT set_config('app.facility_id', ?, true),
 		       set_config('app.user_id', ?, true)
 	""";
@@ -64,7 +64,7 @@ public class FacilityContextTransactionManager extends JpaTransactionManager {
 		}
 	}
 	
-	private void applyContext() {
+	protected void applyContext() {
 		FacilityContext context = FacilityContext.isBound() ? FacilityContext.getCurrent() : null;
 		String facilityId = (context != null && context.facilityId() != null) ? context.facilityId().toString() : "";
 		String userId = (context != null && context.userId() != null) ? context.userId().toString() : "";
@@ -75,7 +75,7 @@ public class FacilityContextTransactionManager extends JpaTransactionManager {
 		}
 		
 		Connection connection = DataSourceUtils.getConnection(dataSource);
-		try (PreparedStatement statement = connection.prepareStatement(APPLY_CONTEXT_SQL)) {
+		try (PreparedStatement statement = connection.prepareStatement(CONTEXT_SQL_QUERY)) {
 			statement.setString(1, facilityId);
 			statement.setString(2, userId);
 			statement.execute();
