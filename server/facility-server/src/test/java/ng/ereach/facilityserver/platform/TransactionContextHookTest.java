@@ -85,16 +85,7 @@ public class TransactionContextHookTest extends PostgresIntegrationTest {
 	private Long currentTransactionId() {
 		return jdbcTemplate.queryForObject("SELECT txid_current()", Long.class);
 	}
-	
-	/*
-	org.springframework.dao.DataIntegrityViolationException: PreparedStatementCallback;
-	SQL [	INSERT INTO facility (id, name, type, state_code, lga_code, hospital_number_prefix, nhfr_code, created_at, updated_at)
-	VALUES
-	    (?, 'Primex Hospital', 'secondary', 'LA', 'LA-ALM', 'AH', 'NG-01515', ?, ?),
-	    (?, 'Novia Hospital', 'secondary', 'OG', 'OG-YWN', 'FT', 'NG-97762', ?, ?)
-	]; No value specified for parameter 5.
-	 */
-	
+
 	@BeforeEach
 	public void configureDatabaseAccessAndSeedDatabase() {
 		databaseTableOwner = new JdbcTemplate(new DriverManagerDataSource(databaseUrl, "ereach_owner", "ereach_owner"));
@@ -390,11 +381,11 @@ public class TransactionContextHookTest extends PostgresIntegrationTest {
 					UPDATE clinic
 					SET facility_id = ?
 					WHERE facility_id = ? AND code = ?
-				""", noviaHospitalId.uuid(), primexHospitalId.uuid(), "ORTHO/OOPD")))
+				""", noviaHospitalId.uuid(), primexHospitalId.uuid(), "ORTHO")))
 			);
 			
 			// Then it fails with SQLState 42501 (WITH CHECK constraint prevents mutating the tenant discriminator column)
-			java.sql.SQLException sqlException = (java.sql.SQLException) exception.getMostSpecificCause();
+			SQLException sqlException = (SQLException) exception.getMostSpecificCause();
 			assertEquals("42501", sqlException.getSQLState(), "Expected an RLS policy mutation check violation (42501)");
 		}
 		
@@ -408,7 +399,7 @@ public class TransactionContextHookTest extends PostgresIntegrationTest {
 			FacilityContext.runWithContext(contextA, () -> transaction.executeWithoutResult(_ -> {
 				int rowsUpdated = jdbcTemplate.update("""
 					UPDATE clinic SET name = 'Defaced Name' WHERE facility_id = ? AND code = ?
-				""", noviaHospitalId.uuid(), "PSYCH/MH");
+				""", noviaHospitalId.uuid(), "PSYCH");
 				
 				assertEquals(0, rowsUpdated, "Update must affect 0 rows because RLS completely masks the foreign tenant's record.");
 			}));
@@ -418,7 +409,7 @@ public class TransactionContextHookTest extends PostgresIntegrationTest {
 					org.springframework.dao.DataAccessException.class,
 					() -> FacilityContext.runWithContext(contextA, () -> transaction.executeWithoutResult(_ -> jdbcTemplate.update("""
 					DELETE FROM clinic WHERE facility_id = ? AND code = ?
-				""", noviaHospitalId.uuid(), "PSYCH/MH")))
+				""", noviaHospitalId.uuid(), "PSYCH")))
 			);
 			
 			// Assert that the delete failure is due to explicit missing DML permissions (SQLState 42501)
@@ -506,11 +497,11 @@ public class TransactionContextHookTest extends PostgresIntegrationTest {
 						resultSet.getString("code"),
 						resultSet.getString("name")
 				));
-				
-				// Then only Novia rows get sorted and come back cleanly (Alphabetical: DENT, then PSYCH/MH)
+
+				// Then only Novia rows get sorted and come back cleanly (Alphabetical: DENT, then PSYCH)
 				assertEquals(List.of(
 						new ClinicRow(noviaHospitalId.uuid(), "DENT", "Novia Dental Clinic"),
-						new ClinicRow(noviaHospitalId.uuid(), "PSYCH/MH", "Novia Psychiatry/Mental Health Clinic")
+						new ClinicRow(noviaHospitalId.uuid(), "PSYCH", "Novia Psychiatry/Mental Health Clinic")
 				), clinics, "The transaction must only yield rows corresponding to the active context binding");
 			}));
 		}
