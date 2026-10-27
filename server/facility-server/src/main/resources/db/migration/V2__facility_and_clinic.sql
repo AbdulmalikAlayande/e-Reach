@@ -22,14 +22,7 @@ $$ LANGUAGE plpgsql;
 CREATE TABLE state (
     code VARCHAR(10) NOT NULL PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
-    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMPTZ
 );
-
-CREATE TRIGGER update_state_modtime
-    BEFORE UPDATE ON state
-    FOR EACH ROW
-    EXECUTE FUNCTION set_audit_columns();
 
 REVOKE INSERT, UPDATE ON state FROM ereach_app;
 
@@ -38,15 +31,8 @@ CREATE TABLE lga (
     code TEXT PRIMARY KEY ,
     state_code VARCHAR(10) NOT NULL REFERENCES state(code) ON UPDATE CASCADE ON DELETE RESTRICT,
     name VARCHAR(100) NOT NULL,
-    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMPTZ,
     CONSTRAINT ux_lga_state_code UNIQUE (state_code, code)
 );
-
-CREATE TRIGGER update_lga_modtime
-    BEFORE UPDATE ON lga
-    FOR EACH ROW
-    EXECUTE FUNCTION set_audit_columns();
 
 REVOKE INSERT, UPDATE ON lga FROM ereach_app;
 
@@ -62,7 +48,7 @@ CREATE TABLE facility (
     state_code VARCHAR(10) NOT NULL,
     lga_code VARCHAR(20) NOT NULL,
     address VARCHAR(255),
-    status text NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'deactivated')),
+    status text NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'inactive')),
     phone_number VARCHAR(20),
     nhfr_code text CHECK (btrim(nhfr_code) <> ''),
     state_registration_number text CHECK (btrim(state_registration_number) <> ''),
@@ -72,7 +58,7 @@ CREATE TABLE facility (
     updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_by  UUID        NOT NULL DEFAULT NULLIF(current_setting('app.user_id', true), '')::uuid,
     deleted_at TIMESTAMPTZ,
-    row_version BIGINT DEFAULT 0,
+    row_version BIGINT NOT NULL DEFAULT 0,
     hospital_number_prefix VARCHAR(50) NOT NULL CHECK (hospital_number_prefix ~ '^[A-Z]{2,6}$'),
 
     CHECK ((state_registration_number IS NULL) = (state_registration_agency IS NULL)),
@@ -110,7 +96,13 @@ CREATE TABLE facility_setting (
     updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_by  UUID        NOT NULL DEFAULT NULLIF(current_setting('app.user_id', true), '')::uuid,
     deleted_at TIMESTAMPTZ,
-    row_version BIGINT DEFAULT 0,
+    row_version BIGINT NOT NULL DEFAULT 0,
+
+    CHECK (
+        (key IN ('session.idle_lock_minutes', 'session.max_hours') AND jsonb_typeof(value) = 'number')
+        OR
+        (key NOT IN ('session.idle_lock_minutes', 'session.max_hours') AND jsonb_typeof(value) = 'boolean')
+    )
 
     CONSTRAINT ux_facility_setting_facility_id UNIQUE (facility_id, id)
 );
@@ -141,7 +133,7 @@ CREATE TABLE clinic (
     created_by  UUID        NOT NULL DEFAULT NULLIF(current_setting('app.user_id', true), '')::uuid,
     updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_by  UUID        NOT NULL DEFAULT NULLIF(current_setting('app.user_id', true), '')::uuid,
-    row_version BIGINT DEFAULT 0,
+    row_version BIGINT NOT NULL DEFAULT 0,
     deleted_at TIMESTAMPTZ,
 
     CONSTRAINT ux_clinic_facility_id UNIQUE (facility_id, id)
@@ -155,3 +147,8 @@ CREATE POLICY clinic_policy ON clinic
     USING (facility_id = NULLIF(current_setting('app.facility_id', true), '')::uuid)
     WITH CHECK (facility_id = NULLIF(current_setting('app.facility_id', true), '')::uuid);
 ALTER TABLE clinic FORCE ROW LEVEL SECURITY;
+
+CREATE TRIGGER update_facility_setting_modtime
+    BEFORE UPDATE ON facility_setting
+    FOR EACH ROW
+    EXECUTE FUNCTION set_audit_columns();
