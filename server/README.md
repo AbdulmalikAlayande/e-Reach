@@ -61,7 +61,7 @@ The e-Reach Setup Guide, Chapter 11, lists every problem met during setup, with 
 | [PRD](docs/prd.md) | What e-Reach must do: scope, roles, feature specs, engineering rules, sprint plan |
 | [Batch 2: System Design](docs/batch-2/system-design.md) | Why it is built this way: decision records, diagrams, the full database schema |
 | [Setup Guide](docs/setup-guide.md) | How to set up a machine and run the server, step by step, with pitfalls |
-| [ARCHITECTURE.md](ARCHITECTURE.md) | The module map and the rules every change must keep |
+| [ARCHITECTURE.md](OLD_ARCHITECTURE.md) | The module map and the rules every change must keep |
 
 ## Security and patient data
 
