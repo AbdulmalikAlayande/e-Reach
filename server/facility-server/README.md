@@ -58,4 +58,4 @@ Any test that needs the database extends `PostgresIntegrationTest`. It starts on
 
 ## Where code goes
 
-Each feature area is a package directly under `ng.ereach`, for example `ng.ereach.visit` or `ng.ereach.billing`. Spring Modulith treats each one as a module. Classes in the package's root are its public API; everything else goes in an `internal` sub-package that other modules may not use. The full module list and the rules every change must keep are in the root `ARCHITECTURE.md`.
+Each feature area is a package directly under `ng.ereach`, for example `ng.ereach.visit` or `ng.ereach.billing`. Spring Modulith treats each one as a module. Classes in the package's root are its public API; everything else goes in an `internal` sub-package that other modules may not use. The full module list and the rules every change must keep are in the root `../OLD_ARCHITECTURE.md`.
