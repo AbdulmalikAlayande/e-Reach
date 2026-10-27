@@ -79,8 +79,10 @@ public class FacilityContextTransactionManager extends JpaTransactionManager {
 			statement.setString(1, facilityId);
 			statement.setString(2, userId);
 			statement.execute();
-		} catch (SQLException e) {
-			throw new IllegalStateException("Could not set app.facility_id and app.user_id", e);
-		}
+		} catch (SQLException exception) {
+			throw new IllegalStateException("Could not set app.facility_id and app.user_id", exception);
+		} finally {
+            DataSourceUtils.releaseConnection(connection, dataSource);
+        }
 	}
 }
