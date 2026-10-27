@@ -5,11 +5,11 @@ import java.util.HashSet;
 import java.util.Set;
 
 public class SystemActors {
-	
-	private static final UserId INSTALLER = UserId.newId();
-	private static final UserId REFERENCE_DATA = UserId.newId();
-	private static final UserId AUDIT_SEALER = UserId.newId();
-	private static final UserId OUTBOX_SENDER = UserId.newId();
+
+	public static final UserId INSTALLER      = UserId.of("00000000-0000-7000-8000-000000000001");
+	public static final UserId REFERENCE_DATA = UserId.of("00000000-0000-7000-8000-000000000002");
+	public static final UserId AUDIT_SEALER   = UserId.of("00000000-0000-7000-8000-000000000003");
+	public static final UserId OUTBOX_SENDER  = UserId.of("00000000-0000-7000-8000-000000000004");
 	
 	public static UserId getInstallerId() {
 		return INSTALLER;
