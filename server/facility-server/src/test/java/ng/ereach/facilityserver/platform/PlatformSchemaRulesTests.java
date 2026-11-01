@@ -404,9 +404,18 @@ class PlatformSchemaRulesTests extends PostgresIntegrationTest {
 	@Test
 	@DisplayName("TC-006-26 | A facility setting with a key outside the seven known keys is refused")
 	void testThatAFacilitySettingWithAnUnknownKeyIsRefused() {
-		assertFailWithSqlState("42703", () -> runQueryAsFacility(defaultTestFacility, () ->
-				database.update("INSERT INTO facility_setting (id, facility_id, key_, value_) VALUES (?, ?, 'foo.bar', '{}'::jsonb)",
-						Ids.newId(), defaultTestFacility)));
+		// Given facility A is set.
+		// When a setting with the key 'foo.bar' and a valid true/false value is inserted.
+		DataAccessException exception = assertThrows(DataAccessException.class, () -> runQueryAsFacility(defaultTestFacility, () ->
+				database.update("""
+						INSERT INTO facility_setting (id, facility_id, key, value, created_by, updated_by)
+						VALUES (?, ?, 'foo.bar', 'true'::jsonb, ?, ?)
+						""", Ids.newId(), defaultTestFacility, currentUserId, currentUserId)));
+
+		// Then the key check refuses it (23514, facility_setting_key_check).
+		SQLException sqlException = (SQLException) exception.getMostSpecificCause();
+		assertEquals("23514", sqlException.getSQLState());
+		assertTrue(sqlException.getMessage().contains("facility_setting_key_check"), sqlException.getMessage());
 	}
 	
 	@Test
