@@ -262,11 +262,18 @@ public class FacilityIsolationTests extends PostgresIntegrationTest {
 	@Test
 	@DisplayName("TC-006-05 | A malformed facility setting makes the query fail instead of returning rows")
 	void testThatAMalformedFacilitySettingFailsTheQueryWithInvalidUuidErrorInsteadOfLeakingRows() {
-		// Given: app.facility_id set to 'not-a-uuid'
-		
-		// When: clinics are selected
-		
-		// Then: The query fails with an invalid-UUID error; no rows are returned
+		DataAccessException exception = assertThrows(DataAccessException.class, () ->
+				transaction.executeWithoutResult(_ -> {
+					// Given: app.facility_id set to 'not-a-uuid'
+					appUsingDatabaseTables.queryForObject("SELECT set_config('app.facility_id', ?, true)", String.class, "not-a-uuid");
+
+					// When: clinics are selected
+					appUsingDatabaseTables.queryForList("SELECT id FROM clinic", UUID.class);
+				}));
+
+		// Then: The query fails with an invalid-UUID error (22P02); no rows are returned
+		SQLException sqlException = (SQLException) exception.getMostSpecificCause();
+		assertEquals("22P02", sqlException.getSQLState(), sqlException.getMessage());
 	}
 	
 	@Test
