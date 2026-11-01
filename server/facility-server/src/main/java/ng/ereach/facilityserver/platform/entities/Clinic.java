@@ -2,7 +2,10 @@ package ng.ereach.facilityserver.platform.entities;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Pattern;
-import ng.ereach.facilityserver.platform.converters.ClinicIdConverter;
+import ng.ereach.facilityserver.platform.converters.ClinicIdJavaType;
+import org.hibernate.annotations.JavaType;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import ng.ereach.facilityserver.platform.entities.enums.ClinicStatus;
 import ng.ereach.shared.entities.BaseEntity;
 import ng.ereach.shared.id.ClinicId;
@@ -15,7 +18,8 @@ import org.hibernate.annotations.SoftDeleteType;
 public class Clinic extends BaseEntity {
 
     @Id
-    @Convert(converter = ClinicIdConverter.class)
+    @JavaType(ClinicIdJavaType.class)
+    @JdbcTypeCode(SqlTypes.UUID)
     private ClinicId id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
