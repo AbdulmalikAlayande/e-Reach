@@ -131,6 +131,10 @@ SHA-1, 6 digits, 30-second steps, as every common app supports; one step of drif
 Hibernate 7 refuses an `AttributeConverter` on an `@Id`. A primary key is mapped as `@Id @JavaType(FacilityIdJavaType.class) @JdbcTypeCode(SqlTypes.UUID)`. `TypedIdJavaType` in `shared` holds the shared logic, and each typed ID has a small subclass: `FacilityIdJavaType` and `UserIdJavaType` in `shared`, `ClinicIdJavaType` in `platform`. A typed ID in any other attribute keeps its `AttributeConverter`, named with an explicit `@Convert`, because entity scanning does not reach `ng.ereach.shared`, so `autoApply` on the `shared` converters has no effect.
 **See:** `ng.ereach.shared.converters.TypedIdJavaType`, `Facility`, `Clinic`, `UserAccount`.
 
+### D-020 · 01/11/2026 · Entities refer to their facility by ID, not by association · Built
+`Clinic` and `FacilitySetting` hold `FacilityId facilityId` on the `facility_id` column instead of a `@ManyToOne` to `Facility`. Hibernate 7 cannot load a to-one association lazily when the target entity has `@SoftDelete`, and an eager one would load the facility row with every clinic and setting.
+**See:** `Clinic`, `FacilitySetting`.
+
 ---
 
 ## Tests
