@@ -242,7 +242,7 @@ public class SharedApplicationTests {
 			int exitCode = process.waitFor();
 			assertEquals(0, exitCode, "Maven dependency:tree execution failed!");
 			
-			//Then: 'Compile' scope holds only uuid-creator; everything else is 'Test' scope
+			//Then: uuid-creator is the only required compile dependency; Spring starters are optional; the rest is test scope
 			boolean foundUuidCreator = verifyOnlyUuidCreatorExistsInDepsTree(depsTreeLines);
 			assertTrue(foundUuidCreator, "Validation missing: uuid-creator was not found in the dependency tree.");
 		} catch (Exception e) {
@@ -253,31 +253,33 @@ public class SharedApplicationTests {
 	}
 	
 	/**
-	 * Inspect the dependency tree output for compile-scope dependencies and validate policy.
+	 * Checks the dependencies the shared module declares itself (version 2 of TC-004-02, under D-003).
 	 *
-	 * <p>By design the shared module should expose a minimal compile-time surface. This
-	 * helper scans the lines produced by {@code mvn -pl shared dependency:tree}
-	 * and ensures there are no unexpected {@code :compile} scoped dependencies. The only
-	 * permitted compile-scoped dependency is {@code com.github.f4b6a3:uuid-creator} which
-	 * is required by the shared utilities. Any other compile-scoped dependency will cause
-	 * an immediate {@link AssertionError} to be thrown to highlight an unintended
-	 * compile-time coupling.</p>
+	 * <p>Only the top level of the tree is checked, because those are the lines {@code shared/pom.xml}
+	 * controls; what they bring in transitively is reported by Maven with the scope it mediated.
+	 * The rule: {@code uuid-creator} is the only required compile dependency, every other compile
+	 * dependency is marked {@code (optional)} (the Spring Boot starters, so a consumer chooses them),
+	 * and everything else is test scope.</p>
 	 *
 	 * @param depsTreeLines the lines of text produced by the Maven dependency tree execution; must not be null.
-	 * @return {@code true} if the expected compile dependency {@code com.github.f4b6a3:uuid-creator}
-	 *         was found and no other compile-scope dependency exists.
-	 * @throws AssertionError when an unexpected compile-scoped dependency is encountered.
-	 * @since 0.0.1
+	 * @return {@code true} if {@code com.github.f4b6a3:uuid-creator} was found as a required compile dependency.
+	 * @throws AssertionError when a declared dependency breaks the rule.
 	 */
 	private boolean verifyOnlyUuidCreatorExistsInDepsTree(List<String> depsTreeLines) {
-        boolean foundUuidCreator = false;
+		boolean foundUuidCreator = false;
 		for (String line : depsTreeLines) {
-			String trimmedLine = line.trim();
-			if (trimmedLine.endsWith(":compile")) {
-				if (!trimmedLine.contains("com.github.f4b6a3:uuid-creator"))
-					throw new AssertionError("Unexpected compile dependency found in shared module: " + trimmedLine);
-				else
-					foundUuidCreator = true;
+			String entry = line.replace("[INFO]", "").trim();
+			if (line.contains("[INFO] |") || line.contains("[INFO]    ")
+					|| !(entry.startsWith("+- ") || entry.startsWith("\\- "))) {
+				continue; // not a dependency the shared pom declares directly
+			}
+			String dependency = entry.substring(3);
+			if (dependency.startsWith("com.github.f4b6a3:uuid-creator:") && dependency.endsWith(":compile")) {
+				foundUuidCreator = true;
+			} else if (dependency.endsWith(":compile (optional)") || dependency.endsWith(":test")) {
+				// allowed: an optional Spring starter, or a test-only library
+			} else {
+				throw new AssertionError("Shared module declares a dependency outside the D-003 rule: " + dependency);
 			}
 		}
 		return foundUuidCreator;
