@@ -203,6 +203,10 @@ A missing or wrong setup code is 403 `ACCESS_DENIED`; once a confirmed operator 
 An invitation's joining code, and the link in its email, carry the facility server's address as well as the secret, so a newly installed app learns which server to connect to by accepting the invitation. Nobody types or searches for an address to join. The code's format, length and expiry are still open (Q-6).
 **See:** D-010, PRD F2 step 3.
 
+### D-033 · 01/11/2026 · Setting up finds the new server by its typed address · Decided
+When someone chooses "set up a new facility server" there is no invitation yet, so no code can carry the address (D-032). They type the server's address on the start screen, because whoever installs the server knows where it is. If they cannot, the app offers a search of the hospital network that lists the servers whose name contains "ereach", such as `ereach.local` (the hostname F15 assumes) or `ereach.<something>`, and they pick theirs. How the app searches is not decided yet. This answers Q-9.
+**See:** D-031, PRD F1.
+
 ---
 
 ## Tests
@@ -226,5 +230,6 @@ A test that creates person accounts truncates `mfa_challenge, mfa_method, practi
 | Q-4 | Which desktop wrapper | 28/10/2026 | Developer's choice; WebAuthn inside its webview must be tested before relying on it |
 | Q-5 | Which WebAuthn library | 01/11/2026 | See D-016 |
 | Q-6 | Invitation table, code format and expiry | 28/10/2026 | ER-007; the code must also carry the server's address (D-032) |
+| Q-9 | How does the app find a new server for "set up a new facility server", before any invitation exists: a typed address, or a search of the hospital network? | 01/11/2026 | Answered by D-033: a typed address, with a search of the hospital network as a fallback |
 | Q-7 | Column name for a user reference: V3 uses `user_account_id`, the planned V4 to V9 tables use `user_id` | 01/11/2026 | Pick one before V4 is written |
 | Q-8 | Is `user_account.must_change_password` still needed, now that invited staff choose their own password? | 01/11/2026 | Answered by D-023: only for an admin-forced reset |
