@@ -266,9 +266,8 @@ FROM ereach_app;
 
 Staff accounts, the four system actors, MFA methods and challenges, sign-in protection, security keys, clinician credentials, memberships and roles (PRD F2, ADR-020, ADR-021). Spring Session's own tables are in V1\_1. The SQL below is the migration file as it stands on 01/11/2026.
 
-Two decided changes are not in the file yet (`docs/decisions/log.md`):
+D-009 is in the file: `user_account.is_platform_operator`, the system-secrets check that refuses it for a system account, and a `role_code` list without `'platform_operator'`. One decided change is not in the file yet (`docs/decisions/log.md`):
 
-- D-009: `user_account` gains `is_platform_operator boolean NOT NULL DEFAULT false`, `ck_user_account_system_secrets` adds `AND is_platform_operator = false`, and `'platform_operator'` leaves the `role_code` list.
 - D-010: an invitation table, designed in ER-007.
 
 Notes on the file: the author columns have no foreign key, as everywhere; `sign_in_throttle` and `mfa_challenge` are written before or during sign-in and carry no author columns; `mfa_challenge` rows may be deleted. Tests that empty tables must include `role_assignment, facility_membership, user_security_key` before `facility`, and never truncate `user_account`, which holds the system actors.
@@ -538,7 +537,7 @@ CREATE TABLE role_assignment (
     role_code      TEXT NOT NULL CHECK (role_code IN (
         'records_officer', 'nurse', 'doctor', 'lab_scientist', 'pharmacist', 'cashier',
         'accounts_officer', 'insurance_officer', 'facility_admin', 'medical_director',
-        'data_protection_lead', 'platform_operator')
+        'data_protection_lead')
     ),
     created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
     created_by   UUID NOT NULL DEFAULT NULLIF(current_setting('app.user_id', true), '')::UUID,
