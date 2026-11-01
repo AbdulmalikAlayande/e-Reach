@@ -192,7 +192,7 @@ Statuses come from the developer's run of 26/10/2026. V2 has changed since, so t
 
 ## Ticket ER-007, part 1: the first platform operator
 
-**Goal:** prove item 1 of `docs/pending-features.md` (D-002): on a brand-new server, the person installing e-Reach opens the desktop app's first-run screen, gives the platform operator's name, username, email, optional phone, password and PIN, sets up MFA, and becomes the first operator, and this works only while no confirmed operator exists and only with the installer's one-time setup code. Sources: PRD F1 and F2, D-008, D-009, D-013, D-014, D-021 to D-030, ADR-007, ADR-018, ADR-020 and ADR-021, and the transcript of 01/11/2026 (the server draws the QR code; the issuer is plain `e-Reach`).
+**Goal:** prove item 1 of `docs/pending-features.md` (D-002): on a brand-new server, the person installing e-Reach chooses "set up a new facility server" on the desktop app's start screen, gives the platform operator's name, username, email, optional phone, password and PIN, sets up MFA, and becomes the first operator, and this works only while that server has no confirmed operator (D-031). Sources: PRD F1 and F2, D-008, D-009, D-013, D-014, D-021 to D-031, ADR-007, ADR-018, ADR-020 and ADR-021, and the transcript of 01/11/2026 (the server draws the QR code; the issuer is plain `e-Reach`).
 
 **Out of scope here:** signing in afterwards (items 2 to 4), adding further operators (item 8), the audit event for the new operator (ER-009), idempotency enforcement (ER-005; the requests below still send `Idempotency-Key`, as every write must), and the email and passkey methods themselves (D-026: refused with 501 until built).
 
@@ -209,11 +209,11 @@ Statuses come from the developer's run of 26/10/2026. V2 has changed since, so t
 | A7 | The QR code is drawn, and read in the tests, with ZXing `core` 3.5.3 | D-027 |
 | A8 | `mfa_required_by` for an operator is the moment the account is made (elevated roles need MFA at once) | D-028 |
 | A9 | Every person has an email, stored in lower case and used by one live account | D-022 |
-| A10 | The step is three endpoints under `/api/v1/setup/`, each needing the setup code in `X-Setup-Code`; 403 `ACCESS_DENIED` for a missing or wrong code; 404 once a confirmed operator exists or when no code is configured; `Cache-Control: no-store` on every answer | D-029 |
+| A10 | The step is three endpoints under `/api/v1/setup/`, behind the start screen's "set up a new facility server" path; 404 once a confirmed operator exists; `Cache-Control: no-store` on every answer; no setup code | D-029, D-031 |
 
-**Classes.** In `ng.ereach.facilityserver.iam`: `AuthenticatorSecretGeneratorTests` (part A, unit), `MfaSecretCipherTests` (part B, unit and one Spring context runner case), `UserAccountSchemaRulesTests` (part C, integration), `PlatformOperatorSetupTests` (parts D and E, API tests through MockMvc against the real context and PostgreSQL) and `PlatformOperatorSetupClosedTests` (TC-007-67, a context with no setup code).
+**Classes.** In `ng.ereach.facilityserver.iam`: `AuthenticatorSecretGeneratorTests` (part A, unit), `MfaSecretCipherTests` (part B, unit and one Spring context runner case), `UserAccountSchemaRulesTests` (part C, integration) and `PlatformOperatorSetupTests` (parts D and E, API tests through MockMvc against the real context and PostgreSQL).
 
-**Shared setup for parts C, D and E.** As `ereach_owner`, empty `mfa_challenge, mfa_method, practitioner_profile, role_assignment, facility_membership, user_security_key, facility_setting, clinic, facility, lga, state`, then delete every `user_account` row of kind `person`, so the four system actors stay (D-017, D-030). Part C writes run as `ereach_app` inside `FacilityContext.forUserOnly(SystemActors.INSTALLER)`. Parts D and E run with `ereach.setup.code` set to a random code made by the test, and with a `Clock` bean fixed at 01/11/2026 09:00 UTC; every request sends that code (unless the case says otherwise), a new `Idempotency-Key` and a CSRF token. "The operator" is Amina Bello, username `amina.bello`, email `amina.bello@primexhospital.ng`, phone `+2348031234567`, a 16-character password and PIN `4821`. "The current code" is the authenticator code for the clock's time step, made from the setup response's manual key.
+**Shared setup for parts C, D and E.** As `ereach_owner`, empty `mfa_challenge, mfa_method, practitioner_profile, role_assignment, facility_membership, user_security_key, facility_setting, clinic, facility, lga, state`, then delete every `user_account` row of kind `person`, so the four system actors stay (D-017, D-030). Part C writes run as `ereach_app` inside `FacilityContext.forUserOnly(SystemActors.INSTALLER)`. Parts D and E run with a `Clock` bean fixed at 01/11/2026 09:00 UTC; every request sends a new `Idempotency-Key` and a CSRF token. "The operator" is Amina Bello, username `amina.bello`, email `amina.bello@primexhospital.ng`, phone `+2348031234567`, a 16-character password and PIN `4821`. "The current code" is the authenticator code for the clock's time step, made from the setup response's manual key.
 
 **RFC 6238 test secret.** Part A uses the secret of RFC 6238 Appendix B: the 20 ASCII bytes `12345678901234567890` for SHA-1, the 32 bytes `12345678901234567890123456789012` for SHA-256, and the 64 bytes `1234567890` repeated six times followed by `1234` for SHA-512.
 
@@ -301,19 +301,19 @@ API tests: each case sends HTTP requests to the setup endpoints and checks the a
 | TC-007-54 | The confirming code cannot be used again | An authenticator confirmed with code C | C is verified at the same moment | 422 `INVALID_MFA_CODE` | API | F2, D-014 | Withdrawn | Withdrawn (01/11/2026): the setup endpoints close the moment the code is confirmed (D-024, D-029), so the replay can only be tried at sign-in; TC-007-13 proves the rule and item 4 tests it at sign-in |
 | TC-007-55 | Confirming with no setup is a 404 | The operator has been created, with no MFA method | a code is confirmed | 404 `NOT_FOUND` | API | PRD section 10 | PlatformOperatorSetupTests | Failing |
 | TC-007-56 | Every method can be asked for; only the built one works | The operator has been created | setup starts with `email`, `passkey` and `sms` | `email` and `passkey` 501 `MFA_METHOD_NOT_AVAILABLE` (A6); `sms` 400 `MFA_METHOD_NOT_SUPPORTED` | API | D-026 | PlatformOperatorSetupTests | Failing |
-| TC-007-57 | Nothing secret reaches the logs | The whole step, from account to confirmation, with log output captured | the captured output is searched | None of: the password, the PIN, the setup code, the manual key, the provisioning URI, the QR image | API | F2 acceptance criterion, D-029 | PlatformOperatorSetupTests | Failing |
-| TC-007-58 | The step's answers hold no secrets | The operator has been created | the creation answer is read | No password, PIN, either hash or setup code in it | API | F2 | PlatformOperatorSetupTests | Failing |
+| TC-007-57 | Nothing secret reaches the logs | The whole step, from account to confirmation, with log output captured | the captured output is searched | None of: the password, the PIN, the manual key, the provisioning URI, the QR image | API | F2 acceptance criterion | PlatformOperatorSetupTests | Failing |
+| TC-007-58 | The step's answers hold no secrets | The operator has been created | the creation answer is read | No password, PIN or either hash in it | API | F2 | PlatformOperatorSetupTests | Failing |
 
 ### Part E: the way in
 
 | ID | Checks | Given | When | Then | Level | Traces to | Class | Status |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| TC-007-59 | Every setup endpoint closes after the first operator | A confirmed operator | each of the three setup endpoints is called with the right setup code | 404 from each | API | F1 acceptance criterion 1, D-029 | PlatformOperatorSetupTests | Failing |
+| TC-007-59 | Every setup endpoint closes after the first operator | A confirmed operator | each of the three setup endpoints is called | 404 from each | API | F1 acceptance criterion 1, D-029, D-031 | PlatformOperatorSetupTests | Failing |
 | TC-007-60 | Setup answers are never cached | The step runs from account to confirmation | each answer is read | `Cache-Control: no-store` on each | API | D-029 | PlatformOperatorSetupTests | Failing |
 | TC-007-61 | Refusals keep the shared problem shape | A taken username | the step runs | `application/problem+json`; `type` `https://ereach.ng/problems/username-taken`; title; status 409; detail; `instance` starting `urn:uuid:`; `code` `USERNAME_TAKEN` | API | PRD section 10, ADR-019 | PlatformOperatorSetupTests | Failing |
-| TC-007-65 | No setup code, no setup | A new server | the step runs without `X-Setup-Code` | 403 `ACCESS_DENIED`; no account saved | API | D-029 | PlatformOperatorSetupTests | Failing |
-| TC-007-66 | A wrong setup code is refused | A new server | the step runs with a wrong code | 403 `ACCESS_DENIED`, the expected code nowhere in the answer; no account saved | API | D-029 | PlatformOperatorSetupTests | Failing |
-| TC-007-67 | Without a configured code the step does not exist | A server started with `ereach.setup.code` blank | the step runs with any code | 404; no account saved | API | D-029 | PlatformOperatorSetupClosedTests | Failing |
+| TC-007-65 | No setup code, no setup | A new server | the step runs without `X-Setup-Code` | 403 `ACCESS_DENIED`; no account saved | API | D-029 | Withdrawn | Withdrawn (01/11/2026): D-031 drops the setup code |
+| TC-007-66 | A wrong setup code is refused | A new server | the step runs with a wrong code | 403 `ACCESS_DENIED`, the expected code nowhere in the answer; no account saved | API | D-029 | Withdrawn | Withdrawn (01/11/2026): D-031 drops the setup code |
+| TC-007-67 | Without a configured code the step does not exist | A server started with `ereach.setup.code` blank | the step runs with any code | 404; no account saved | API | D-029 | Withdrawn | Withdrawn (01/11/2026): D-031 drops the setup code, so there is no configured code to be missing |
 
 ## Traceability
 
@@ -337,7 +337,7 @@ Every PRD rule or feature a ticket touches should be proved by at least one case
 | D-009, ADR-021 | Being an operator is an account flag; a system account never has it; an operator sees no facility data | TC-007-25, TC-007-30, TC-007-32, TC-007-33, TC-007-43 |
 | D-013, D-014; F2, MFA | TOTP with SHA-1, 6 digits, 30 seconds, one step of drift, no code twice, secret encrypted with AES-256-GCM | TC-007-01 to TC-007-24, TC-007-46 to TC-007-56, TC-007-60 |
 | D-021, D-022 | Usernames stored as typed and unique ignoring case; every person has a lower-case email used once | TC-007-27, TC-007-35, TC-007-40, TC-007-41, TC-007-62 to TC-007-64 |
-| D-024, D-029 | The installer step is three setup endpoints behind a one-time setup code, closed once the operator's MFA is confirmed | TC-007-42, TC-007-44, TC-007-45, TC-007-50, TC-007-59 to TC-007-61, TC-007-65 to TC-007-67 |
+| D-024, D-029, D-031 | Setting up a new server is three setup endpoints, closed once the operator's MFA is confirmed | TC-007-42, TC-007-44, TC-007-45, TC-007-50, TC-007-59 to TC-007-61 |
 | D-026 | All three MFA methods can be chosen; unbuilt ones answer 501 | TC-007-56 |
 
 ## Sources
