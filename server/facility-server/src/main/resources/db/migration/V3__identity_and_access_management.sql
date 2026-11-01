@@ -22,6 +22,9 @@ CREATE TABLE user_account (
     -- A person (human) always has a password, but a system actor don't have one.
     CONSTRAINT ck_user_account_password CHECK ((kind = 'person') = (password_hash IS NOT NULL)),
 
+    -- A person always has an email address (D-022); a system actor never has one (next check).
+    CONSTRAINT ck_user_account_person_email CHECK (kind <> 'person' OR email IS NOT NULL),
+
     -- A system actor never has a PIN, an email or an MFA deadline, and is never a platform operator.
     CONSTRAINT ck_user_account_system_secrets
         CHECK (kind = 'person' OR (pin_hash IS NULL AND email IS NULL AND mfa_required_by IS NULL AND is_platform_operator = false))
