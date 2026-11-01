@@ -178,7 +178,8 @@ The server draws the authenticator QR code itself (transcript of 01/11/2026) as 
 This answers Q-1.
 **Replaces:** PRD F2 and ADR-007, which required MFA only for clinical and admin roles.
 
-### D-029 · 01/11/2026 · The installer step is a first-run screen behind a one-time setup code · Decided
+### D-029 · 01/11/2026 · The installer step is a first-run screen behind a one-time setup code · Replaced in part
+**Replaced in part by:** D-031, which drops the setup code and replaces "first-run screen" with the start screen's "set up a new facility server" path. The three endpoints, their answers and `no-store` still hold.
 The desktop app shows a first-run screen that calls setup endpoints under `/api/v1/setup/`. They answer only while no confirmed platform operator exists, and only to a request carrying the setup code in `X-Setup-Code`. The installer makes the code (at least 128 random bits), shows it on the server's own screen and gives it to the server as the environment variable `EREACH_SETUP_CODE` (`ereach.setup.code`), never in the repository or a log. Without that setting the setup endpoints do not exist (404). Setup answers carry `Cache-Control: no-store`, because they hold the secret.
 - `POST /api/v1/setup/platform-operator`: full name, username, email, optional phone, password and PIN; 201 with the account and no secrets.
 - `POST /api/v1/setup/platform-operator/mfa`: the method; 200 `MfaResponse`.
@@ -188,6 +189,15 @@ A missing or wrong setup code is 403 `ACCESS_DENIED`; once a confirmed operator 
 **Why:** the user needs a screen to scan the QR code, and the developer reuses the API, `MfaResponse` and problem shape that sign-in will use. The setup code stops anyone else on the hospital network from claiming the operator account before the installer does, the way Jenkins protects its first admin.
 **Replaces:** D-008's "a screen or the command line".
 **See:** TC-007-34 to TC-007-61, TC-007-65 to TC-007-67.
+
+### D-031 · 01/11/2026 · The start screen offers signing in or setting up a new server; there is no setup code · Decided
+- The desktop app's start screen has two paths. **Sign in** to a facility server the person already belongs to, which is what every PC does every day. **Set up a new facility server**, used once per server: it creates the first platform operator, and it works only while that server has no confirmed operator; afterwards it is closed on that server for good (D-024). Installing the app on another PC never creates an operator.
+- There is no other way to create an account. Everyone else is invited, accepts the invitation and then signs in (D-010).
+- The one-time setup code of D-029 is dropped. It guarded only the minutes between the server starting and the operator confirming MFA. A stranger who claimed the server first would be noticed at once, because the installer's own attempt is refused, and the server holds no data yet, so it is reset and set up again.
+- The setup endpoints stay as D-029 describes them, without `X-Setup-Code`: 404 once a confirmed operator exists, `Cache-Control: no-store` on every answer.
+- D-025 still holds: the username screen of the setup path is reachable only on a server with no operator, and the others only with a valid joining code.
+**Replaces:** the setup code of D-029 (`X-Setup-Code`, `EREACH_SETUP_CODE`, the 403 for a missing or wrong code, the 404 when no code is configured) and its "first-run screen" wording.
+**See:** TC-007-34 to TC-007-61.
 
 ---
 
