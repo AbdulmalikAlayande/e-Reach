@@ -207,6 +207,11 @@ An invitation's joining code, and the link in its email, carry the facility serv
 When someone chooses "set up a new facility server" there is no invitation yet, so no code can carry the address (D-032). They type the server's address on the start screen, because whoever installs the server knows where it is. If they cannot, the app offers a search of the hospital network that lists the servers whose name contains "ereach", such as `ereach.local` (the hostname F15 assumes) or `ereach.<something>`, and they pick theirs. How the app searches is not decided yet. This answers Q-9.
 **See:** D-031, PRD F1.
 
+### D-034 · 01/11/2026 · Services are interfaces with package-private implementations, and there is no base CRUD service · Built
+- Each service is an interface in its module's `services` package (for example `iam.services.PlatformSetupService`), implemented by a package-private class beside it (`PlatformSetupServiceImpl`), so controllers and other modules can only depend on the interface.
+- There is no base service with generic create, read, update and delete, and no generic entity, request and response types. Insert-only records (charges, payments, audit events) must never be updated or deleted, signed clinical records are amended rather than edited, editable records are soft-deleted, and every read of patient data goes through the policy engine (PRD section 8, rules 7, 10 and 13), so a generic CRUD base would mostly hold methods that must be forbidden. Services name their domain actions instead, and each returns the response types it needs. If the same operations repeat across several modules later, they can become a shared helper then.
+**See:** `iam.services`.
+
 ---
 
 ## Tests
