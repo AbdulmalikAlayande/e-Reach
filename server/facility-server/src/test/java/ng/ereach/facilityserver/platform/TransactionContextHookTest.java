@@ -6,7 +6,6 @@ import ng.ereach.facilityserver.platform.internal.FacilityContextTransactionMana
 import ng.ereach.shared.id.FacilityId;
 import ng.ereach.shared.id.Ids;
 import ng.ereach.shared.id.UserId;
-import org.jspecify.annotations.NonNull;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -24,14 +23,12 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.transaction.support.TransactionTemplate;
 
 import javax.sql.DataSource;
-import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 @SpringBootTest
 public class TransactionContextHookTest extends PostgresIntegrationTest {
@@ -90,7 +87,7 @@ public class TransactionContextHookTest extends PostgresIntegrationTest {
 	public void configureDatabaseAccessAndSeedDatabase() {
 		databaseTableOwner = new JdbcTemplate(new DriverManagerDataSource(databaseUrl, "ereach_owner", "ereach_owner"));
 		
-		databaseTableOwner.execute("TRUNCATE facility_setting, clinic, facility, lga, state");
+		databaseTableOwner.execute("TRUNCATE role_assignment, facility_membership, user_security_key, facility_setting, clinic, facility, lga, state");
 		databaseTableOwner.update("INSERT INTO state (code, name) VALUES ('LA', 'Lagos'), ('OG', 'Ogun')");
 		databaseTableOwner.update("""
 			INSERT INTO lga (code, state_code, name)
@@ -703,53 +700,49 @@ public class TransactionContextHookTest extends PostgresIntegrationTest {
 	@Nested
 	@DisplayName("When applying the context fails")
 	class FailureTests {
-		
+
 		@Test
 		@DisplayName("TC-006-55 | If the context cannot be applied, the transaction is not left open and the error reaches the caller")
 		void tc_006_55_failureLeavesNothingOpen() {
-			// Given the context statement fails
-			DataSource poisonedDataSource = new DriverManagerDataSource(){
+			AtomicBoolean transactionWasOpen = new AtomicBoolean(false);
+			AtomicBoolean workRan = new AtomicBoolean(false);
+
+			// Given a transaction manager that opens a real transaction, then fails while applying the context.
+			FacilityContextTransactionManager failingManager = new FacilityContextTransactionManager(entityManagerFactory) {
 				@Override
-				public @NonNull Connection getConnection() throws SQLException {
-					throw new SQLException("Simulated database failure during context configuration", "08006");
+				protected void applyContext() {
+					transactionWasOpen.set(TransactionSynchronizationManager.hasResource(entityManagerFactory));
+					throw new IllegalStateException("Simulated failure while applying the facility context");
 				}
 			};
-			
-			EntityManagerFactory mockEmf = mock(jakarta.persistence.EntityManagerFactory.class);
-			when(mockEmf.createEntityManager()).thenThrow(new IllegalStateException("Should not reach EMF creation if DataSource fails first"));
-			
-			FacilityContextTransactionManager failingManager = new FacilityContextTransactionManager(mockEmf) {
-				@Override
-				public javax.sql.DataSource getDataSource() {
-					return poisonedDataSource;
-				}
-			};
-			
+			failingManager.afterPropertiesSet();
+			DataSource dataSource = failingManager.getDataSource();
+			assertNotNull(dataSource, "afterPropertiesSet() should find the DataSource behind the EntityManagerFactory");
 			TransactionTemplate failingTransaction = new TransactionTemplate(failingManager);
-			
-			// When a transaction starts
+
+			// When a transaction starts with facility A in the context.
 			CannotCreateTransactionException error = assertThrows(CannotCreateTransactionException.class,
 					() -> FacilityContext.runWithContext(primexContext(),
-							() -> failingTransaction.executeWithoutResult(_ -> fail("The work must never run"))));
-			
-			FacilityContext contextA = new FacilityContext(primexHospitalId, new UserId(currentUserId));
-			
-			// When a transaction starts and configuration fails
-			RuntimeException error1 = assertThrows(RuntimeException.class, () -> FacilityContext.runWithContext(
-				contextA, () -> failingTransaction.executeWithoutResult(_ -> fail("The business logic should never execute"))));
-			
-			// Then the error reaches the caller with the real cause inside it
-			assertInstanceOf(IllegalStateException.class, error.getCause());
-			assertInstanceOf(RuntimeException.class, error1.getCause());
-			
-			// And nothing is left bound to this thread
+							() -> failingTransaction.executeWithoutResult(_ -> workRan.set(true))));
+
+			// Then a real transaction had been opened before the failure, so the cleanup below undid something real.
+			assertTrue(transactionWasOpen.get(), "The failure should come after JpaTransactionManager opened the transaction");
+
+			// And the error reaches the caller with the real cause inside it.
+			assertEquals("Could not apply the facility context to the new transaction", error.getMessage());
+			IllegalStateException cause = assertInstanceOf(IllegalStateException.class, error.getCause());
+			assertEquals("Simulated failure while applying the facility context", cause.getMessage());
+
+			// And the work never ran.
+			assertFalse(workRan.get(), "The work must never run");
+
+			// And nothing is left bound to this thread.
 			assertNull(TransactionSynchronizationManager.getResource(entityManagerFactory));
-			assertNull(TransactionSynchronizationManager.getResource(failingManager.getDataSource()));
+			assertNull(TransactionSynchronizationManager.getResource(dataSource));
 			assertFalse(TransactionSynchronizationManager.isActualTransactionActive());
-			
-			assertTrue(error1.getMessage().contains("Error applying facility context") || error1.getMessage().contains("aborted"));
-			
-			// And the application still works normally afterwards
+			assertFalse(TransactionSynchronizationManager.isSynchronizationActive());
+
+			// And the application still works normally afterwards.
 			assertEquals(PRIMEX_CLINIC_CODES,
 					FacilityContext.callWithContext(primexContext(), TransactionContextHookTest.this::readClinicCodesInTransaction));
 		}
