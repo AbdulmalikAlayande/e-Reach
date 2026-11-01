@@ -1,12 +1,14 @@
 package ng.ereach.facilityserver.platform.entities;
 
 import jakarta.persistence.Column;
-import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import ng.ereach.facilityserver.platform.entities.enums.FacilityStatus;
 import ng.ereach.facilityserver.platform.entities.enums.FacilityType;
-import ng.ereach.shared.converters.FacilityIdConverter;
+import ng.ereach.shared.converters.FacilityIdJavaType;
+import org.hibernate.annotations.JavaType;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import ng.ereach.shared.entities.BaseEntity;
 import ng.ereach.shared.id.FacilityId;
 import org.hibernate.annotations.SoftDelete;
@@ -17,7 +19,8 @@ import org.hibernate.annotations.SoftDeleteType;
 public class Facility extends BaseEntity {
 
     @Id
-    @Convert(converter = FacilityIdConverter.class)
+    @JavaType(FacilityIdJavaType.class)
+    @JdbcTypeCode(SqlTypes.UUID)
     private FacilityId id;
 
     private String name;
