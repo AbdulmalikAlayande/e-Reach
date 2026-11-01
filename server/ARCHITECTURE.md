@@ -79,7 +79,7 @@ Most of these are rules about something that must never happen. Each is enforced
 
 - **Tenancy:** `FacilityContext` (a `ScopedValue` holding the facility and the user) and `FacilityContextTransactionManager`, which applies it to every transaction, plus row-level security, as in rules 1 and 4.
 - **Authorship:** column defaults and the `set_audit_columns` trigger, as in rule 13. The base entity reads the columns back with Hibernate's `@Generated`.
-- **Sign-in:** server-side sessions; Argon2id for passwords and PINs; MFA (an authenticator app, an email code, or a facility-issued security key that cannot be synced) for clinical and admin roles (ADR-020); backoff per username and PC; a new session ID at sign-in, PIN unlock, facility switch and step-up.
+- **Sign-in:** server-side sessions; Argon2id for passwords and PINs; MFA (an authenticator app, an email code, or a facility-issued security key that cannot be synced) for every staff role, at once for elevated roles and within 30 days for the rest (ADR-020, D-028); backoff per username and PC; a new session ID at sign-in, PIN unlock, facility switch and step-up.
 - **Audit:** a change's audit event commits in the same transaction as the change; a denial's event commits in its own transaction so it survives the rollback. Events are sealed in blocks and the seal hashes are shipped to the central platform.
 - **Idempotency:** one request filter and one `idempotency_record` table make any retried write safe.
 - **Identifiers:** UUIDv7, generated in the application, wrapped in a typed record per entity and assigned in the entity's constructor, never a raw `UUID` in a method signature.
