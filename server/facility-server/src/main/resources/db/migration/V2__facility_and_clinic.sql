@@ -143,6 +143,12 @@ CREATE TABLE clinic (
 CREATE UNIQUE INDEX ux_clinic_code
     ON clinic (facility_id, code) WHERE deleted_at IS NULL;
 
+-- Keeps created_* unchanged and stamps updated_* on every update (PRD section 8, rule 19)
+CREATE TRIGGER update_clinic_modtime
+    BEFORE UPDATE ON clinic
+    FOR EACH ROW
+    EXECUTE FUNCTION set_audit_columns();
+
 ALTER TABLE clinic ENABLE ROW LEVEL SECURITY;
 CREATE POLICY clinic_policy ON clinic
     USING (facility_id = NULLIF(current_setting('app.facility_id', true), '')::uuid)
