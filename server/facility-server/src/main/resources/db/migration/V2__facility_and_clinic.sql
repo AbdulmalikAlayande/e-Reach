@@ -66,8 +66,9 @@ CREATE TABLE facility (
     -- Foreign key constraint ensuring the pair (state_code, lga_code) exists in the lga table
     CONSTRAINT fk_facility_lga FOREIGN KEY (state_code, lga_code) REFERENCES lga (state_code, code)
 );
-CREATE UNIQUE INDEX ux_facility_prefix ON facility (hospital_number_prefix);
-CREATE UNIQUE INDEX ux_facility_nhfr_code ON facility (nhfr_code);
+-- Unique among live facilities only (D-018), so a soft-deleted facility does not hold its prefix or code.
+CREATE UNIQUE INDEX ux_facility_prefix ON facility (hospital_number_prefix) WHERE deleted_at IS NULL;
+CREATE UNIQUE INDEX ux_facility_nhfr_code ON facility (nhfr_code) WHERE deleted_at IS NULL;
 
 -- Trigger to auto-update updated_at on facility
 CREATE TRIGGER update_facility_modtime
