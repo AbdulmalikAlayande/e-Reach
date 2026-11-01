@@ -120,6 +120,15 @@ SHA-1, 6 digits, 30-second steps, as every common app supports; one step of drif
 
 ---
 
+## Data model and mapping
+
+### D-018 · 01/11/2026 · A facility's prefix and national code are unique among live facilities only · Built
+`ux_facility_prefix` and `ux_facility_nhfr_code` are partial indexes `WHERE deleted_at IS NULL`, like every other uniqueness rule on an editable table (PRD section 8, rule 7). A soft-deleted facility no longer holds its hospital number prefix or national facility code.
+**Replaces:** the full unique indexes in the first V2.
+**See:** V2, `PlatformSchemaRulesTests` (TC-006-20, TC-006-21).
+
+---
+
 ## Tests
 
 ### D-017 · 28/10/2026 · Tests empty the V3 tables too · Decided
