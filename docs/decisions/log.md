@@ -151,6 +151,11 @@ The first operator types their own password at the installer, and invited staff 
 **Replaces:** V3's default of true and its "one-time password" comment.
 **See:** V3, `UserAccount`.
 
+### D-024 · 01/11/2026 · The installer step is finished only when the operator's MFA is confirmed · Decided
+Until the new operator confirms their first MFA code, the step is not finished: running it again soft-deletes the unconfirmed operator account (and its pending MFA method) and creates the new one. Once a confirmed operator exists, the step is closed for good.
+**Why:** an installer who closes the window before scanning the QR code would otherwise leave an operator nobody can sign in as, and the step would refuse to run again.
+**See:** TC-007-45.
+
 ---
 
 ## Tests
