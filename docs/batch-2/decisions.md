@@ -576,7 +576,7 @@ Accepted means build it. Provisional means build it with the default described, 
 
 - The installer creates the first operator (name, username, email, optional phone, password, PIN, MFA), running as the INSTALLER system actor, only while no confirmed operator exists. It is the "set up a new facility server" path of the desktop app's start screen, which works only while that server has no confirmed operator, and it finishes only when the operator's first MFA code is confirmed (amended 01/11/2026, decision log D-022, D-024, D-029 and D-031). Existing operators add further operators.
 - Being an operator is `user_account.is_platform_operator`; system accounts can never have it; `platform_operator` leaves the facility role list. An operator with no membership sees no facility data, because row-level security needs `app.facility_id`.
-- Staff, including a facility's first `facility_admin`, join by invitation: a single-use, expiring joining code, also emailed when the internet is up, whose link opens the installed app. An existing user on the same server joins from the facility switcher with the code and their PIN.
+- Staff, including a facility's first `facility_admin`, join by invitation: a single-use, expiring joining code, also emailed when the internet is up, whose link opens the installed app. The code and the link carry the facility server's address, so accepting connects the app to that server (amended 01/11/2026, decision log D-032). An existing user on the same server joins from the facility switcher with the code and their PIN.
 
 **Alternatives.**
 
