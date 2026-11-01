@@ -178,6 +178,17 @@ The server draws the authenticator QR code itself (transcript of 01/11/2026) as 
 This answers Q-1.
 **Replaces:** PRD F2 and ADR-007, which required MFA only for clinical and admin roles.
 
+### D-029 · 01/11/2026 · The installer step is a first-run screen behind a one-time setup code · Decided
+The desktop app shows a first-run screen that calls setup endpoints under `/api/v1/setup/`. They answer only while no confirmed platform operator exists, and only to a request carrying the setup code in `X-Setup-Code`. The installer makes the code (at least 128 random bits), shows it on the server's own screen and gives it to the server as the environment variable `EREACH_SETUP_CODE` (`ereach.setup.code`), never in the repository or a log. Without that setting the setup endpoints do not exist (404). Setup answers carry `Cache-Control: no-store`, because they hold the secret.
+- `POST /api/v1/setup/platform-operator`: full name, username, email, optional phone, password and PIN; 201 with the account and no secrets.
+- `POST /api/v1/setup/platform-operator/mfa`: the method; 200 `MfaResponse`.
+- `POST /api/v1/setup/platform-operator/mfa/confirm`: the method and the code; 200 `MfaResponse` `CONFIRMED`, which finishes the step (D-024).
+
+A missing or wrong setup code is 403 `ACCESS_DENIED`; once a confirmed operator exists every setup endpoint answers 404. Time comes from the application's `Clock` bean, so tests can fix it.
+**Why:** the user needs a screen to scan the QR code, and the developer reuses the API, `MfaResponse` and problem shape that sign-in will use. The setup code stops anyone else on the hospital network from claiming the operator account before the installer does, the way Jenkins protects its first admin.
+**Replaces:** D-008's "a screen or the command line".
+**See:** TC-007-34 to TC-007-61, TC-007-65 to TC-007-67.
+
 ---
 
 ## Tests
