@@ -1,6 +1,5 @@
 package ng.ereach.facilityserver.iam.entities;
 
-import jakarta.persistence.Convert;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
@@ -8,7 +7,10 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Pattern;
 import ng.ereach.facilityserver.iam.entities.enums.UserAccountStatus;
 import ng.ereach.facilityserver.iam.entities.enums.UserAccountKind;
-import ng.ereach.shared.converters.UserIdConverter;
+import ng.ereach.shared.converters.UserIdJavaType;
+import org.hibernate.annotations.JavaType;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import ng.ereach.shared.entities.BaseEntity;
 import ng.ereach.shared.id.UserId;
 
@@ -18,7 +20,8 @@ import java.time.Instant;
 public class UserAccount extends BaseEntity {
 
     @Id
-    @Convert(converter = UserIdConverter.class)
+    @JavaType(UserIdJavaType.class)
+    @JdbcTypeCode(SqlTypes.UUID)
     private UserId id;
 
     private UserAccountKind kind;
