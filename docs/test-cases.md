@@ -190,6 +190,125 @@ Statuses come from the developer's run of 26/10/2026. V2 has changed since, so t
 | TC-006-60 | System actor IDs are fixed | SystemActors in shared | its four IDs are read | Each equals its fixed value (…0001 to …0004, as inserted by V3); all four differ; all are version 7 | Unit | Rule 19, ADR-018 | SystemActorsTests (facility-server, `platform` package) | Passing (01/11/2026) |
 | TC-006-61 | A setting survives a save and a load | A facility context with a user | a true/false setting and a whole-number setting are saved through JPA and read back in a new transaction | PostgreSQL holds a JSON boolean and a JSON number; the entity returns the same values and key; created\_by is the user; row\_version is 0 | Integration | F1, section 9 | FacilitySettingMappingTests | Passing (01/11/2026; settles the Hibernate and Jackson 3 JsonNode question) |
 
+## Ticket ER-007, part 1: the first platform operator
+
+**Goal:** prove item 1 of `docs/pending-features.md` (D-002): on a brand-new server, the person installing e-Reach gives the platform operator's name, username, password and PIN, scans a QR code with an authenticator app, and becomes the first operator, and this works only while no operator exists. Sources: PRD F1 (the installer step and its first acceptance criterion) and F2 (password, PIN, MFA and system account rules), D-008, D-009, D-013, D-014, ADR-007, ADR-018, ADR-020 and ADR-021. The transcript of 01/11/2026 adds two points the documents do not hold: the server draws the QR code and sends it as a `data:image/png;base64,` image in `MfaResponse.qrCodeImage`, and the issuer shown in the authenticator app is plain `e-Reach`.
+
+**Out of scope here:** signing in afterwards (items 2 to 4), adding further operators (item 8), the audit event for the new operator (ER-009), and email or passkey MFA (stubs today).
+
+**Assumed, to be confirmed by the maintainer before part D is coded.** These are not in `docs/` or the decision log yet. The cases that depend on one name it.
+
+| # | Assumption | Why |
+| --- | --- | --- |
+| A1 | The operator's label in the authenticator app is their username (`e-Reach:amina.bello`) | D-008 asks for no email, and the current code uses the email, which an operator does not have |
+| A2 | The new operator's `must_change_password` is false | They chose the password themselves (Q-8) |
+| A3 | The step counts as done only once the operator's authenticator is confirmed; an attempt abandoned before that can be run again and replaces the unconfirmed account | Otherwise an installer who closes the window before scanning leaves an operator nobody can sign in as, and the step refuses to run again |
+| A4 | New problem codes: `PLATFORM_OPERATOR_EXISTS` (409) and `USERNAME_TAKEN` (409), in `IamProblem` | Each refusal needs a stable code (PRD section 10) |
+| A5 | A username typed with capitals is stored in lower case, not refused | F2: "stored lower-case"; the database refuses capitals (TC-007-27) |
+| A6 | The installer step offers only the authenticator app | Item 1 says "scans a QR code with an authenticator app"; email needs the internet and passkeys are not built |
+| A7 | The QR code is drawn and, in the tests, read with ZXing (`com.google.zxing:core`) | It is the usual Java QR library; no QR library is in the build yet |
+| A8 | `mfa_required_by` is the moment the account is made | Admin roles set MFA up at first sign-in (F2); the operator sets it up during the step |
+
+**Classes.** In `ng.ereach.facilityserver.iam`: `AuthenticatorSecretGeneratorTests` (part A, unit), `MfaSecretCipherTests` (part B, unit and one Spring context runner case), `UserAccountSchemaRulesTests` (part C, integration, extends `PostgresIntegrationTest`), `PlatformOperatorSetupTests` (part D, integration) and a test for the entry point once it is chosen (part E).
+
+**Shared setup for parts C and D.** As `ereach_owner`, empty `mfa_challenge, mfa_method, practitioner_profile, role_assignment, facility_membership, user_security_key, facility_setting, clinic, facility, lga, state`, then delete every `user_account` row of kind `person`, so the four system actors stay (D-017). Every write runs as `ereach_app` inside `FacilityContext.forUserOnly(SystemActors.INSTALLER)`, as the installer will (D-008), unless the case says otherwise. Times come from a fixed `Clock`, never from the wall clock.
+
+**RFC 6238 test secret.** Part A uses the secret of RFC 6238 Appendix B: the 20 ASCII bytes `12345678901234567890` for SHA-1, the 32 bytes `12345678901234567890123456789012` for SHA-256, and the 64 bytes `1234567890` repeated six times followed by `1234` for SHA-512.
+
+### Part A: the TOTP building blocks
+
+| ID | Checks | Given | When | Then | Level | Traces to | Class | Status |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| TC-007-01 | A secret is as long as the HMAC output, and random | Nothing | `generateSecret` is called twice for SHA-1, and once each for SHA-256 and SHA-512 | 20, 32 and 64 bytes; the two SHA-1 secrets differ | Unit | D-014, RFC 6238 R3 | AuthenticatorSecretGeneratorTests | Passing (01/11/2026) |
+| TC-007-02 | Base32 follows RFC 4648 without padding | The RFC 4648 section 10 inputs (examples below) | each is encoded | `MY`, `MZXQ`, `MZXW6`, `MZXW6YQ`, `MZXW6YTB`, `MZXW6YTBOI`, never a `=` | Unit | D-014, RFC 4648 | AuthenticatorSecretGeneratorTests | Passing (01/11/2026) |
+| TC-007-03 | Base32 decodes what users type | `mzxw6ytboi`, `MZXW 6YTB OI` and `MZXW6YTBOI======` | each is decoded | Each gives the bytes of `foobar` | Unit | D-014 | AuthenticatorSecretGeneratorTests | Passing (01/11/2026) |
+| TC-007-04 | Base32 refuses foreign characters | `MZXW1` (1 is not in the alphabet) | it is decoded | IllegalArgumentException | Unit | D-014 | AuthenticatorSecretGeneratorTests | Passing (01/11/2026) |
+| TC-007-05 | The manual entry key has a fixed shape | A new SHA-1 secret | it is encoded | Exactly 32 characters from A to Z and 2 to 7, with no `=` | Unit | D-014 | AuthenticatorSecretGeneratorTests | Passing (01/11/2026) |
+| TC-007-06 | Codes match RFC 6238 (SHA-1, 8 digits) | The SHA-1 test secret and the times below | the code for each time step is made | The RFC values below | Unit | D-014, RFC 6238 Appendix B | AuthenticatorSecretGeneratorTests | Passing (01/11/2026) |
+| TC-007-07 | A six-digit code keeps its leading zero | The SHA-1 test secret at time 1111111109 | the 6-digit code is made | `081804` (the last six digits of `07081804`) | Unit | D-014 | AuthenticatorSecretGeneratorTests | Passing (01/11/2026) |
+| TC-007-08 | The other two RFC algorithms work too | The SHA-256 and SHA-512 test secrets at time 59 | 8-digit codes are made | `46119246` and `90693936` | Unit | RFC 6238 Appendix B | AuthenticatorSecretGeneratorTests | Passing (01/11/2026) |
+| TC-007-09 | Time steps are 30 seconds from the epoch | Times 0, 29, 30, 59 and 60 | the step is computed | 0, 0, 1, 1 and 2 | Unit | D-014, RFC 6238 section 4 | AuthenticatorSecretGeneratorTests | Passing (01/11/2026) |
+| TC-007-10 | The current code is accepted | The SHA-1 test secret at time 1111111111, no step used yet | `050471` is verified | Accepted, matching step 37037037 | Unit | D-014 | AuthenticatorSecretGeneratorTests | Passing (01/11/2026) |
+| TC-007-11 | One step of drift either way is accepted | The same secret and time | the codes of steps 37037036 (`081804`) and 37037038 are verified | Both accepted, each returning its own step | Unit | D-014, RFC 6238 section 5.2 | AuthenticatorSecretGeneratorTests | Passing (01/11/2026) |
+| TC-007-12 | Two steps of drift are refused | The same secret and time | the codes of steps 37037035 and 37037039 are verified | Both refused | Unit | D-014 | AuthenticatorSecretGeneratorTests | Passing (01/11/2026) |
+| TC-007-13 | A used code never works twice | The current code, with the last accepted step equal to the current step | it is verified again | Refused; with the last accepted step one lower, accepted | Unit | F2, D-014 | AuthenticatorSecretGeneratorTests | Passing (01/11/2026) |
+| TC-007-14 | A malformed code is refused, not thrown | `05047`, `0504711`, `05a471` and ` 50471` | each is verified | Each refused, with no exception | Unit | D-014 | AuthenticatorSecretGeneratorTests | Passing (01/11/2026) |
+| TC-007-15 | The provisioning URI has the agreed shape | Issuer `e-Reach`, account `amina.bello`, secret `JBSWY3DPEHPK3PXP` | the URI is built | `otpauth://totp/e-Reach:amina.bello?secret=JBSWY3DPEHPK3PXP&issuer=e-Reach&algorithm=SHA1&digits=6&period=30` | Unit | D-014, Key Uri Format | AuthenticatorSecretGeneratorTests | Passing (01/11/2026) |
+| TC-007-16 | Label and issuer are percent-encoded | Issuer `My App & Co`, account `amina bello` | the URI is built | Spaces become `%20` (never `+`) and `&` becomes `%26`, in the label and in the issuer parameter | Unit | RFC 3986 | AuthenticatorSecretGeneratorTests | Passing (01/11/2026) |
+| TC-007-17 | Unusable URI inputs are refused | A colon in the issuer or the account, a blank issuer, 5 or 9 digits, a period of 0 | the URI is built | IllegalArgumentException each time | Unit | Key Uri Format, RFC 4226 R4 | AuthenticatorSecretGeneratorTests | Passing (01/11/2026) |
+
+Examples for TC-007-02 (RFC 4648 section 10, padding removed): `f` → `MY`, `fo` → `MZXQ`, `foo` → `MZXW6`, `foob` → `MZXW6YQ`, `fooba` → `MZXW6YTB`, `foobar` → `MZXW6YTBOI`.
+
+Examples for TC-007-06 (RFC 6238 Appendix B, SHA-1): 59 → `94287082`, 1111111109 → `07081804`, 1111111111 → `14050471`, 1234567890 → `89005924`, 2000000000 → `69279037`, 20000000000 → `65353130`.
+
+### Part B: keeping the secret encrypted
+
+| ID | Checks | Given | When | Then | Level | Traces to | Class | Status |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| TC-007-18 | A secret survives encryption | A cipher with a random 32-byte key and a 20-byte secret | it is encrypted, then decrypted | The same 20 bytes | Unit | F2, D-014 | MfaSecretCipherTests | Passing (01/11/2026) |
+| TC-007-19 | The stored form hides the secret | The same | it is encrypted | 48 bytes (12 IV, 20 ciphertext, 16 tag), and the secret's bytes do not appear in them | Unit | D-014 | MfaSecretCipherTests | Passing (01/11/2026) |
+| TC-007-20 | Every encryption uses a fresh IV | The same secret | it is encrypted twice | The two results differ, and both decrypt to the secret | Unit | D-014, NIST SP 800-38D | MfaSecretCipherTests | Passing (01/11/2026) |
+| TC-007-21 | A changed byte is detected | A stored secret with one byte flipped | it is decrypted | IllegalStateException, never wrong bytes | Unit | D-014 | MfaSecretCipherTests | Passing (01/11/2026) |
+| TC-007-22 | Another key cannot read it | A secret stored under key K | a cipher with another key decrypts it | IllegalStateException | Unit | D-014 | MfaSecretCipherTests | Passing (01/11/2026) |
+| TC-007-23 | Only a 32-byte key is accepted | A base64 16-byte key, and text that is not base64 | the cipher is made | IllegalStateException naming the 32 bytes, and IllegalArgumentException | Unit | D-014 | MfaSecretCipherTests | Passing (01/11/2026) |
+| TC-007-24 | No key, no start | A Spring context with `MfaSecretCipher` and no `ereach.mfa.encryption-key` | it starts | It fails, naming `ereach.mfa.encryption-key`; with a key it starts and holds the cipher | Integration | D-014, PRD rule 17 | MfaSecretCipherTests | Passing (01/11/2026) |
+
+### Part C: the database rules for the operator account
+
+| ID | Checks | Given | When | Then | Level | Traces to | Class | Status |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| TC-007-25 | An operator account is a person, active, flagged, and authored by the installer | The installer context | a person `amina.bello` with password and PIN hashes and `is_platform_operator` true is inserted, without author columns | Stored as kind `person`, status `active`, `is_platform_operator` true; `created_by` and `updated_by` are the INSTALLER | Integration | D-008, D-009, ADR-018 | UserAccountSchemaRulesTests | Passing (01/11/2026) |
+| TC-007-26 | A person must have a password | The installer context | a person with no password hash is inserted | Refused with 23514 by `ck_user_account_password` | Integration | F2, V3 | UserAccountSchemaRulesTests | Passing (01/11/2026) |
+| TC-007-27 | Usernames are lower case, 3 to 40 of `a-z 0-9 . _ -` | The installer context | persons named `Amina`, `ab`, 41 letters and `amina bello` are inserted | Each refused with 23514 | Integration | F2, V3 | UserAccountSchemaRulesTests | Passing (01/11/2026) |
+| TC-007-28 | A username is used once | The system actor `system.installer` exists | a person with that username is inserted | Refused with 23505 by `ux_user_account_username` | Integration | F2, V3 | UserAccountSchemaRulesTests | Passing (01/11/2026) |
+| TC-007-29 | A phone number is in international form | The installer context | a person with phone `08031234567` is inserted, then one with `+2348031234567` | The first refused with 23514; the second stored | Integration | V3 | UserAccountSchemaRulesTests | Passing (01/11/2026) |
+| TC-007-30 | A system account is never an operator | The installer context | a system account flagged as operator is inserted, and the INSTALLER row is updated to be an operator | Both refused with 23514 by `ck_user_account_system_secrets` | Integration | F2, D-009 | UserAccountSchemaRulesTests | Passing (01/11/2026) |
+| TC-007-31 | No author, no account | No context at all | a person is inserted | Refused with 23502 naming `created_by` | Integration | Rule 19, ADR-018 | UserAccountSchemaRulesTests | Passing (01/11/2026) |
+| TC-007-32 | An operator sees no facility's data | A facility with a clinic, and another person's membership and role there | the operator's context (user only, no facility) counts clinics, memberships and role assignments | All three counts are 0 | Integration | D-009, ADR-021, rule 1 | UserAccountSchemaRulesTests | Passing (01/11/2026) |
+| TC-007-33 | `platform_operator` is no longer a facility role | A facility and a membership in it | a role assignment `platform_operator` is inserted | Refused with 23514 | Integration | D-009 | UserAccountSchemaRulesTests | Passing (01/11/2026) |
+
+### Part D: the installer step
+
+These cases call the step's service (`PlatformSetupService` and `MFAService` today) inside the installer context, with a fixed `Clock`.
+
+| ID | Checks | Given | When | Then | Level | Traces to | Class | Status |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| TC-007-34 | The step creates the first operator | A new server (only the system actors exist) | the step runs with name Amina Bello, username `amina.bello`, phone `+2348031234567`, a 12-character password and PIN `4821` | One person account: that name, username and phone, no email, `is_platform_operator` true, status `active`, `must_change_password` false (A2), `mfa_required_by` equal to the clock's now (A8), authored by the INSTALLER | Integration | F1, D-008, D-009 | PlatformOperatorSetupTests | Not written |
+| TC-007-35 | A username is stored in lower case | A new server | the step runs with username `Amina.Bello` | Stored as `amina.bello` (A5) | Integration | F2 | PlatformOperatorSetupTests | Not written |
+| TC-007-36 | The password is kept only as an Argon2id hash | A new server | the step runs | `password_hash` starts with `$argon2id$`, is not the password, and `Argon2PasswordEncoder.defaultsForSpringSecurity_v5_8()` matches it to the password | Integration | F2, ADR-007 | PlatformOperatorSetupTests | Not written |
+| TC-007-37 | The PIN is kept only as an Argon2id hash | A new server | the step runs | `pin_hash` starts with `$argon2id$`, is not the PIN, and the same encoder matches it to the PIN | Integration | F2, ADR-007 | PlatformOperatorSetupTests | Not written |
+| TC-007-38 | A short password is refused | A new server | the step runs with a 9-character password | 400 `VALIDATION_FAILED` listing `password`, without the value; no account saved | Integration | F2 | PlatformOperatorSetupTests | Not written |
+| TC-007-39 | A PIN is 4 to 6 digits | A new server | the step runs with PINs `482`, `4821503` and `48a1` | Each refused with `VALIDATION_FAILED` listing `pin`, without the value; no account saved | Integration | F2 | PlatformOperatorSetupTests | Not written |
+| TC-007-40 | Name and username are checked before saving | A new server | the step runs with a blank name, then with username `amina bello` | `VALIDATION_FAILED` listing `fullName`, then `username`; no account saved, and never a 500 from the database check | Integration | F2, PRD section 10 | PlatformOperatorSetupTests | Not written |
+| TC-007-41 | A taken username has its own answer | A new server | the step runs with username `system.installer` | 409 `USERNAME_TAKEN` (A4), not a 500 | Integration | F2, PRD section 10 | PlatformOperatorSetupTests | Not written |
+| TC-007-42 | The step refuses once an operator exists | A confirmed operator exists | the step runs again with another username | 409 `PLATFORM_OPERATOR_EXISTS` (A4); still exactly one operator | Integration | F1 acceptance criterion 1, D-008 | PlatformOperatorSetupTests | Not written |
+| TC-007-43 | System accounts do not count as operators | A new server with its four system actors | the step runs | It goes ahead | Integration | D-008, D-009 | PlatformOperatorSetupTests | Not written |
+| TC-007-44 | Two installers at once make one operator | A new server | two threads run the step at the same moment, with different usernames | Exactly one succeeds; the other gets `PLATFORM_OPERATOR_EXISTS`; one operator exists | Integration | D-008 | PlatformOperatorSetupTests | Not written |
+| TC-007-45 | An abandoned step can be run again | The step ran but the authenticator was never confirmed | the step runs again | It goes ahead; one operator account exists, the second one (A3) | Integration | D-008 | PlatformOperatorSetupTests | Not written |
+| TC-007-46 | Setup answers with a QR code and a key, nothing else | The new operator | authenticator setup starts | `MfaResponse` with method `totp`, status `PENDING_CONFIRMATION`, `qrCodeImage` starting `data:image/png;base64,`, `manualEntryKey` of 32 Base32 characters; in JSON, no other members | Integration | D-014, transcript 01/11/2026 | PlatformOperatorSetupTests | Not written |
+| TC-007-47 | The QR code holds the account's provisioning URI | The setup response | the PNG is decoded (A7) | `otpauth://totp/e-Reach:amina.bello?...` with the manual key as `secret`, issuer `e-Reach`, SHA1, 6 digits, 30 seconds (A1) | Integration | D-014 | PlatformOperatorSetupTests | Not written |
+| TC-007-48 | Setup stores the secret encrypted and pending | The setup response | `mfa_method` is read | One row of type `totp` for the operator; `secret_encrypted` decrypts to the bytes behind the manual key; `confirmed_at` and `last_used_step` are null; authored by the INSTALLER | Integration | F2, D-013, D-014 | PlatformOperatorSetupTests | Not written |
+| TC-007-49 | Starting setup again replaces the pending secret | A pending authenticator | setup starts again | Still one `mfa_method` row; a new secret; a code from the old secret no longer confirms | Integration | D-014 | PlatformOperatorSetupTests | Not written |
+| TC-007-50 | A confirmed authenticator is not replaced by setup | A confirmed authenticator | setup starts again | 409 `MFA_ALREADY_CONFIGURED`; the stored secret is unchanged | Integration | F2 | PlatformOperatorSetupTests | Not written |
+| TC-007-51 | The first correct code confirms the authenticator | A pending authenticator and the code for the clock's step | it is confirmed | `MfaResponse` status `CONFIRMED`; `confirmed_at` and `last_used_at` equal the clock's now; `last_used_step` is that step | Integration | D-013, D-014 | PlatformOperatorSetupTests | Not written |
+| TC-007-52 | A wrong code leaves setup pending | A pending authenticator | a wrong code is confirmed | 422 `INVALID_MFA_CODE`; `confirmed_at` and `last_used_step` still null | Integration | D-014 | PlatformOperatorSetupTests | Not written |
+| TC-007-53 | Confirmation allows one step of drift | A pending authenticator | the previous step's code is confirmed, and on a second operator setup a code two steps old | The first confirms; the second is refused with `INVALID_MFA_CODE` | Integration | D-014 | PlatformOperatorSetupTests | Not written |
+| TC-007-54 | The confirming code cannot be used again | An authenticator confirmed with code C | C is verified at the same moment | 422 `INVALID_MFA_CODE` | Integration | F2 acceptance criterion, D-014 | PlatformOperatorSetupTests | Not written |
+| TC-007-55 | Confirming with no setup is a 404 | An operator with no authenticator | a code is confirmed | 404 `NOT_FOUND` | Integration | PRD section 10 | PlatformOperatorSetupTests | Not written |
+| TC-007-56 | Only the authenticator app is offered | The new operator | setup starts with `email`, `passkey` and `sms` | `sms` gives 400 `MFA_METHOD_NOT_SUPPORTED`; `email` and `passkey` are refused with the same problem during the installer step (A6) | Integration | Item 1, A6 | PlatformOperatorSetupTests | Not written |
+| TC-007-57 | Nothing secret reaches the logs | The whole step, from account to confirmation, with log output captured | the captured output is searched | It holds none of: the password, the PIN, the manual key, the provisioning URI, the QR image | Integration | F2 acceptance criterion, CLAUDE.md | PlatformOperatorSetupTests | Not written |
+| TC-007-58 | The step's answer holds no secrets | The new operator | the creation response is serialised | No password, PIN or either hash | Integration | F2 | PlatformOperatorSetupTests | Not written |
+
+### Part E: the way in
+
+Not written until the entry point is chosen: a command-line step of the installer, or an HTTP endpoint that answers only while no operator exists (D-008 allows either).
+
+| ID | Checks | Given | When | Then | Level | Traces to | Class | Status |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| TC-007-59 | The way in closes after the first operator | A confirmed operator exists | the installer step is started | It is refused (404 for an endpoint), so it can never create a second operator | API | F1 acceptance criterion 1, D-008 | To be decided | Not written |
+| TC-007-60 | The setup answer is never cached | The setup step over HTTP | the response is read | `Cache-Control: no-store` | API | Transcript 01/11/2026 | To be decided | Not written |
+| TC-007-61 | Errors keep the shared shape | Each refusal in part D | it is answered over the chosen way in | One RFC 9457 problem with its code, or the same code and detail on the command line | API | PRD section 10, ADR-019 | To be decided | Not written |
+
 ## Traceability
 
 Every PRD rule or feature a ticket touches should be proved by at least one case. A rule with no case is a gap; a case with no rule is either a missing requirement or a case that should not exist.
@@ -206,6 +325,11 @@ Every PRD rule or feature a ticket touches should be proved by at least one case
 | Section 8, rule 19; ADR-018 | Every write has a named author, filled in by the database | TC-006-56 to TC-006-60 |
 | F1, section 9 | Setting values are stored as JSON and read back unchanged | TC-006-61 |
 | Section 10; ADR-019 | Every error is one RFC 9457 shape with a stable code, and nothing internal leaks | TC-004B-01 to TC-004B-07 |
+| F1, installer step; D-008 | The first platform operator is created only while none exists, by the INSTALLER actor | TC-007-25, TC-007-34, TC-007-42 to TC-007-45, TC-007-59 |
+| F2, passwords and PINs; ADR-007 | Passwords of 10 or more characters and 4 to 6 digit PINs, kept only as Argon2id hashes, never logged | TC-007-26, TC-007-36 to TC-007-39, TC-007-57, TC-007-58 |
+| F2, usernames | Unique, stored lower case, 3 to 40 allowed characters | TC-007-27, TC-007-28, TC-007-35, TC-007-40, TC-007-41 |
+| D-009, ADR-021 | Being an operator is an account flag; a system account never has it; an operator sees no facility data | TC-007-25, TC-007-30, TC-007-32, TC-007-33, TC-007-43 |
+| D-013, D-014; F2, MFA | TOTP with SHA-1, 6 digits, 30 seconds, one step of drift, no code twice, secret encrypted with AES-256-GCM | TC-007-01 to TC-007-24, TC-007-46 to TC-007-56, TC-007-60 |
 
 ## Sources
 
