@@ -21,7 +21,7 @@ $$ LANGUAGE plpgsql;
 -- 2. State Reference Table
 CREATE TABLE state (
     code VARCHAR(10) NOT NULL PRIMARY KEY,
-    name VARCHAR(100) NOT NULL,
+    name VARCHAR(100) NOT NULL
 );
 
 REVOKE INSERT, UPDATE ON state FROM ereach_app;
@@ -102,7 +102,7 @@ CREATE TABLE facility_setting (
         (key IN ('session.idle_lock_minutes', 'session.max_hours') AND jsonb_typeof(value) = 'number')
         OR
         (key NOT IN ('session.idle_lock_minutes', 'session.max_hours') AND jsonb_typeof(value) = 'boolean')
-    )
+    ),
 
     CONSTRAINT ux_facility_setting_facility_id UNIQUE (facility_id, id)
 );
@@ -147,8 +147,3 @@ CREATE POLICY clinic_policy ON clinic
     USING (facility_id = NULLIF(current_setting('app.facility_id', true), '')::uuid)
     WITH CHECK (facility_id = NULLIF(current_setting('app.facility_id', true), '')::uuid);
 ALTER TABLE clinic FORCE ROW LEVEL SECURITY;
-
-CREATE TRIGGER update_facility_setting_modtime
-    BEFORE UPDATE ON facility_setting
-    FOR EACH ROW
-    EXECUTE FUNCTION set_audit_columns();
