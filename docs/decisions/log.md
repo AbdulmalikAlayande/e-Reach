@@ -156,6 +156,12 @@ Until the new operator confirms their first MFA code, the step is not finished: 
 **Why:** an installer who closes the window before scanning the QR code would otherwise leave an operator nobody can sign in as, and the step would refuse to run again.
 **See:** TC-007-45.
 
+### D-025 · 01/11/2026 · What an account screen may reveal · Decided
+- Sign-in never says whether the username or the password was wrong (PRD F2, one general error).
+- Choosing a username is different: the person must learn that it is taken, or they cannot choose another. Those screens are reachable only with the installer's setup code (D-029) or a valid joining code (D-010), so the answer goes only to someone already allowed in. The problem is 409 `USERNAME_TAKEN`, with the detail "That username is not available. Choose another." and never the value typed.
+- An invitation to an email that already has an account on the server does not fail: the person is sent to join from the facility switcher (D-010). Only the admin who invites may see that the address already has an account; an anonymous screen never confirms that an email exists.
+**See:** TC-007-41.
+
 ---
 
 ## Tests
