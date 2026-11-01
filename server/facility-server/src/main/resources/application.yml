@@ -21,3 +21,8 @@ spring:
       jdbc:
         schema-initialization:
           enabled: false
+
+ereach:
+  mfa:
+    # Base64 of 32 random bytes (AES-256-GCM, D-014). Set by the installer; never committed.
+    encryption-key: ${EREACH_MFA_ENCRYPTION_KEY}
