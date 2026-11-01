@@ -9,6 +9,8 @@ import org.hibernate.type.SqlTypes;
 import ng.ereach.facilityserver.platform.entities.enums.ClinicStatus;
 import ng.ereach.shared.entities.BaseEntity;
 import ng.ereach.shared.id.ClinicId;
+import ng.ereach.shared.converters.FacilityIdConverter;
+import ng.ereach.shared.id.FacilityId;
 import org.hibernate.annotations.SoftDelete;
 import org.hibernate.annotations.SoftDeleteType;
 
@@ -22,9 +24,10 @@ public class Clinic extends BaseEntity {
     @JdbcTypeCode(SqlTypes.UUID)
     private ClinicId id;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "facility_id", nullable = false, updatable = false)
-    private Facility facility;
+    /** The facility by ID only; a to-one association to Facility cannot be lazy, because Facility has @SoftDelete. */
+    @Column(name = "facility_id", nullable = false, updatable = false)
+    @Convert(converter = FacilityIdConverter.class)
+    private FacilityId facilityId;
 
     @Pattern(regexp = "^[A-Z0-9_]{2,20}$")
     @Column(nullable = false)
@@ -39,9 +42,9 @@ public class Clinic extends BaseEntity {
 
     protected Clinic() {}
 
-    public Clinic(Facility facility, String code, String name, ClinicStatus status) {
+    public Clinic(FacilityId facilityId, String code, String name, ClinicStatus status) {
         assignId();
-        this.facility = facility;
+        this.facilityId = facilityId;
         this.code = code;
         this.name = name;
         this.status = status;
@@ -58,8 +61,8 @@ public class Clinic extends BaseEntity {
         return id;
     }
 
-    public Facility getFacility() {
-        return facility;
+    public FacilityId getFacilityId() {
+        return facilityId;
     }
 
     public String getCode() {
