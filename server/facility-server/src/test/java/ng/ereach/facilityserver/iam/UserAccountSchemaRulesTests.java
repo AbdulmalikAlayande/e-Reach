@@ -115,17 +115,18 @@ class UserAccountSchemaRulesTests extends PostgresIntegrationTest {
 
 	/**
 	 * <p>Level: Integration</p>
-	 * <p>Traces to: F2 (usernames stored lower case), V3</p>
+	 * <p>Traces to: F2, D-021 (usernames are stored as typed), V3</p>
 	 */
 	@Test
-	@DisplayName("TC-007-27 | Usernames are 3 to 40 lower-case letters, digits, dots, underscores or hyphens")
+	@DisplayName("TC-007-27 | Usernames are 3 to 40 letters of either case, digits, dots, underscores or hyphens, stored as typed")
 	void usernamesFollowTheAllowedPattern() {
-		// Given the installer's context, and usernames with a capital, too few characters, too many and a space.
+		// Given the installer's context, and usernames with too few characters, too many, a space and a "!".
 		FacilityContext installer = FacilityContext.forUserOnly(SystemActors.INSTALLER);
-		String[] refused = {"Amina", "ab", "a".repeat(41), "amina bello"};
+		String[] refused = {"ab", "a".repeat(41), "amina bello", "amina!"};
+		UUID typedWithCapitalsId = UserId.newId().uuid();
 
-		// When a person is inserted with each.
-		// Then each is refused by the username check.
+		// When a person is inserted with each, then one named Amina.Bello.
+		// Then each of the four is refused by the username check.
 		assertAll(Arrays.stream(refused).map(username -> (Executable) () -> {
 			DataAccessException exception = assertThrows(DataAccessException.class,
 					() -> FacilityContext.runWithContext(installer, () -> transaction.executeWithoutResult(_ -> jdbcTemplate.update("""
@@ -135,6 +136,40 @@ class UserAccountSchemaRulesTests extends PostgresIntegrationTest {
 					"\"" + username + "\" must be refused");
 			assertEquals("23514", sqlCause(exception).getSQLState(), username);
 		}));
+
+		// And Amina.Bello is stored exactly as typed.
+		FacilityContext.runWithContext(installer, () -> transaction.executeWithoutResult(_ -> jdbcTemplate.update("""
+				INSERT INTO user_account (id, kind, username, full_name, password_hash)
+				VALUES (?, 'person', 'Amina.Bello', 'Amina Bello', ?)
+				""", typedWithCapitalsId, PASSWORD_HASH)));
+		assertEquals("Amina.Bello",
+				jdbcTemplate.queryForObject("SELECT username FROM user_account WHERE id = ?", String.class, typedWithCapitalsId));
+	}
+
+	/**
+	 * <p>Level: Integration</p>
+	 * <p>Traces to: D-021 (unique ignoring case), V3 (ux_user_account_username on lower(username))</p>
+	 */
+	@Test
+	@DisplayName("TC-007-62 | Two usernames cannot differ only by case")
+	void usernamesCannotDifferOnlyByCase() {
+		// Given a person named Amina.Bello.
+		FacilityContext installer = FacilityContext.forUserOnly(SystemActors.INSTALLER);
+		FacilityContext.runWithContext(installer, () -> transaction.executeWithoutResult(_ -> jdbcTemplate.update("""
+				INSERT INTO user_account (id, kind, username, full_name, password_hash)
+				VALUES (?, 'person', 'Amina.Bello', 'Amina Bello', ?)
+				""", UserId.newId().uuid(), PASSWORD_HASH)));
+
+		// When a person named amina.bello is inserted.
+		DataAccessException exception = assertThrows(DataAccessException.class,
+				() -> FacilityContext.runWithContext(installer, () -> transaction.executeWithoutResult(_ -> jdbcTemplate.update("""
+						INSERT INTO user_account (id, kind, username, full_name, password_hash)
+						VALUES (?, 'person', 'amina.bello', 'Another Amina', ?)
+						""", UserId.newId().uuid(), PASSWORD_HASH))));
+
+		// Then the case-insensitive unique index refuses it.
+		assertEquals("23505", sqlCause(exception).getSQLState());
+		assertTrue(sqlCause(exception).getMessage().contains("ux_user_account_username"), sqlCause(exception).getMessage());
 	}
 
 	/**
