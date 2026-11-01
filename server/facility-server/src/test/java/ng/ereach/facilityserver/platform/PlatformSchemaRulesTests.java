@@ -50,7 +50,7 @@ class PlatformSchemaRulesTests extends PostgresIntegrationTest {
 	@BeforeEach
 	void seedDatabase() {
 		JdbcTemplate owner = new JdbcTemplate(new DriverManagerDataSource(databaseUrl, "ereach_owner", "ereach_owner"));
-		owner.execute("TRUNCATE facility_setting, clinic, facility, lga, state");
+		owner.execute("TRUNCATE role_assignment, facility_membership, user_security_key, facility_setting, clinic, facility, lga, state");
 		owner.update("""
 				INSERT INTO state (code, name)
 				VALUES ('LA', 'Lagos'), ('OG', 'Ogun'), ('OY', 'Oyo'), ('ABJ', 'Abuja')
