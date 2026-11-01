@@ -278,7 +278,7 @@ Notes on the file: the author columns have no foreign key, as everywhere; `sign_
 CREATE TABLE user_account (
     id                      UUID PRIMARY KEY,
     kind                    TEXT NOT NULL DEFAULT 'person' CHECK (kind IN ('person', 'system')),
-    username                TEXT NOT NULL CHECK (username ~ '^[a-z0-9._-]{3,40}$'),
+    username                TEXT NOT NULL CHECK (username ~ '^[A-Za-z0-9._-]{3,40}$'), -- stored as the user typed it (D-021)
     full_name               TEXT NOT NULL CHECK (btrim(full_name) <> ''),
     email                   TEXT CHECK (email = lower(email) AND email ~ '^[^@\s]+@[^@\s]+\.[^@\s]+$'),
     phone                   TEXT CHECK (phone ~ '^\+[1-9][0-9]{6,14}$'),
@@ -304,7 +304,8 @@ CREATE TABLE user_account (
     -- If mfa_required_by is not null and its value is lesser than now
 );
 
-CREATE UNIQUE INDEX ux_user_account_username ON user_account (username) WHERE deleted_at IS NULL;
+-- Unique ignoring case (D-021): Amina.Bello and amina.bello can never be two different accounts.
+CREATE UNIQUE INDEX ux_user_account_username ON user_account (lower(username)) WHERE deleted_at IS NULL;
 CREATE UNIQUE INDEX ux_user_account_email ON user_account (email) WHERE deleted_at IS NULL AND email IS NOT NULL;
 CREATE TRIGGER tg_user_account_audit_columns BEFORE UPDATE ON user_account
     FOR EACH ROW EXECUTE FUNCTION set_audit_columns();
