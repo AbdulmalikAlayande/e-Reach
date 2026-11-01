@@ -1,9 +1,13 @@
 package ng.ereach.facilityserver.platform.entities;
 
-import jakarta.persistence.*;
-import ng.ereach.facilityserver.platform.converters.FacilityIdConverter;
+import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
 import ng.ereach.facilityserver.platform.entities.enums.FacilityStatus;
 import ng.ereach.facilityserver.platform.entities.enums.FacilityType;
+import ng.ereach.shared.converters.FacilityIdConverter;
+import ng.ereach.shared.entities.BaseEntity;
 import ng.ereach.shared.id.FacilityId;
 import org.hibernate.annotations.SoftDelete;
 import org.hibernate.annotations.SoftDeleteType;

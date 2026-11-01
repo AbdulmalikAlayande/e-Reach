@@ -2,6 +2,7 @@ package ng.ereach.facilityserver.platform.entities;
 
 import jakarta.persistence.*;
 import ng.ereach.facilityserver.platform.entities.enums.FacilitySettingKey;
+import ng.ereach.shared.entities.BaseEntity;
 import ng.ereach.shared.id.Ids;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.SoftDelete;
@@ -49,5 +50,10 @@ public class FacilitySetting extends BaseEntity {
         }
         this.value = value;
     }
+
+    public UUID getId() { return id; }
+    public Facility getFacility() { return facility; }
+    public FacilitySettingKey getKey() { return key; }
+    public JsonNode getValue() { return value; }
 }
 

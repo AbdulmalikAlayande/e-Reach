@@ -1,21 +1,15 @@
-package ng.ereach.facilityserver.platform.entities;
+package ng.ereach.shared.entities;
 
 import jakarta.persistence.Convert;
 import jakarta.persistence.MappedSuperclass;
 import jakarta.persistence.Version;
-import ng.ereach.facilityserver.platform.converters.UserIdConverter;
+import ng.ereach.shared.converters.UserIdConverter;
 import ng.ereach.shared.id.UserId;
 import org.hibernate.annotations.Generated;
 import org.hibernate.generator.EventType;
 
 import java.time.Instant;
 
-/*
-I still need two things:
-
-@EnableJpaAuditing on a configuration class.
-An AuditorAware<UserId> bean, which can read the user from FacilityContext.
- */
 
 @MappedSuperclass
 public abstract class BaseEntity {

@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import jakarta.validation.constraints.Pattern;
 import ng.ereach.facilityserver.platform.converters.ClinicIdConverter;
 import ng.ereach.facilityserver.platform.entities.enums.ClinicStatus;
+import ng.ereach.shared.entities.BaseEntity;
 import ng.ereach.shared.id.ClinicId;
 import org.hibernate.annotations.SoftDelete;
 import org.hibernate.annotations.SoftDeleteType;

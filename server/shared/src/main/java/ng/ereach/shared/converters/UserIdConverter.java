@@ -1,4 +1,4 @@
-package ng.ereach.facilityserver.platform.converters;
+package ng.ereach.shared.converters;
 
 import jakarta.persistence.AttributeConverter;
 import jakarta.persistence.Converter;
