@@ -1,19 +1,11 @@
--- R__states_and_lgas.sql: the 36 states, the FCT and their 774 local government areas.
---
--- Reference data (Batch 2 schema, V2): the application can only read these tables, and only
--- this file, run by Flyway as ereach_owner, changes them. Flyway runs a repeatable (R__)
--- migration again whenever this file changes, after all versioned migrations.
+-- R__states_and_LGAs.sql: the 36 states, the FCT and their 774 local government areas.
 --
 -- Codes never change once released, because facilities and patient addresses refer to them.
 -- State codes are the ISO 3166-2:NG subdivision codes without the "NG-" prefix. An LGA code is
 -- its state code, a hyphen and a two-digit number, numbered in alphabetical order of name when
--- this file was first written. A later correction changes a name, never a code; a new LGA
--- gets the next free number in its state. Rows are never deleted here, because a facility
+-- this file was first written. A later correction will change only the name, it does not have to touch the code;
+-- A new LGA gets the next free number in its state. Also, rows are kept forever here, because a facility
 -- or an address may already point at them.
---
--- Source: the Wikipedia list of local government areas of Nigeria, as kept in the naijR
--- package (data-raw/list_of_local_government_areas_of_nigeria-1729j.csv), with "Fufure"
--- corrected to Fufore and "Kumi" to Kurmi. 37 states and 774 LGAs.
 
 INSERT INTO state (code, name) VALUES
   ('AB', 'Abia'),
