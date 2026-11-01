@@ -3,6 +3,8 @@ package ng.ereach.facilityserver.platform.entities;
 import jakarta.persistence.*;
 import ng.ereach.facilityserver.platform.entities.enums.FacilitySettingKey;
 import ng.ereach.shared.entities.BaseEntity;
+import ng.ereach.shared.converters.FacilityIdConverter;
+import ng.ereach.shared.id.FacilityId;
 import ng.ereach.shared.id.Ids;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.SoftDelete;
@@ -19,9 +21,10 @@ public class FacilitySetting extends BaseEntity {
     @Id
     private UUID id;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "facility_id", nullable = false, updatable = false)
-    private Facility facility;
+    /** The facility by ID only; a to-one association to Facility cannot be lazy, because Facility has @SoftDelete. */
+    @Column(name = "facility_id", nullable = false, updatable = false)
+    @Convert(converter = FacilityIdConverter.class)
+    private FacilityId facilityId;
 
     private FacilitySettingKey key;
 
@@ -31,9 +34,9 @@ public class FacilitySetting extends BaseEntity {
 
     protected FacilitySetting(){}
 
-    public FacilitySetting(Facility facility, FacilitySettingKey key, JsonNode value){
+    public FacilitySetting(FacilityId facilityId, FacilitySettingKey key, JsonNode value){
         assignId();
-        this.facility = facility;
+        this.facilityId = facilityId;
         this.key = key;
         setValue(value);
     }
@@ -52,7 +55,7 @@ public class FacilitySetting extends BaseEntity {
     }
 
     public UUID getId() { return id; }
-    public Facility getFacility() { return facility; }
+    public FacilityId getFacilityId() { return facilityId; }
     public FacilitySettingKey getKey() { return key; }
     public JsonNode getValue() { return value; }
 }
