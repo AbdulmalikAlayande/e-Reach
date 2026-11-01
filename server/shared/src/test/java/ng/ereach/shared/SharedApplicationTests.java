@@ -124,7 +124,7 @@ public class SharedApplicationTests {
 		try {
 			//Given: The root pom.xml lists backend/shared, and facility-server depends on ereach-shared\
 			ProcessBuilder processBuilder = configureProcessBuilder(
-				new String[]{"cmd.exe", "/c", "mvnw.cmd", "validate"},
+				new String[]{"cmd.exe", "/c", PROJECT_ROOT_DIRECTORY.resolve("mvnw.cmd").toString(), "validate"},
 				new String[]{"./mvnw", "validate"}
 			);
 			
@@ -224,7 +224,7 @@ public class SharedApplicationTests {
 		try {
 			//Given: The shared module's pom.xml
 			ProcessBuilder processBuilder = configureProcessBuilder(
-				new String[]{"cmd.exe", "/c", "mvnw.cmd", "-pl", "shared", "dependency:tree"},
+				new String[]{"cmd.exe", "/c", PROJECT_ROOT_DIRECTORY.resolve("mvnw.cmd").toString(), "-pl", "shared", "dependency:tree"},
 				new String[]{"./mvnw", "-pl", "shared", "dependency:tree"}
 			);
 			
