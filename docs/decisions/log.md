@@ -146,6 +146,11 @@ Email is required for every person, the platform operator included, because an o
 **Replaces:** PRD F2 step 1, "full name, email or phone", and D-008's list of what the installer asks for, which had no email.
 **See:** V3 (`ck_user_account_person_email`, `ux_user_account_email`), TC-007-63, TC-007-64.
 
+### D-023 · 01/11/2026 · Nobody gets a temporary password · Built (schema)
+The first operator types their own password at the installer, and invited staff choose theirs when they accept (D-010), so no password is ever made for someone else and handed over on paper or by phone. `must_change_password` defaults to false and is set to true only when an admin forces a reset after a suspected leak, in line with NIST SP 800-63B (force a change on evidence of compromise, not by routine). This answers Q-8.
+**Replaces:** V3's default of true and its "one-time password" comment.
+**See:** V3, `UserAccount`.
+
 ---
 
 ## Tests
@@ -166,4 +171,4 @@ Every `@BeforeEach` that empties tables must include `role_assignment, facility_
 | Q-5 | Which WebAuthn library | 01/11/2026 | See D-016 |
 | Q-6 | Invitation table, code format and expiry | 28/10/2026 | ER-007 |
 | Q-7 | Column name for a user reference: V3 uses `user_account_id`, the planned V4 to V9 tables use `user_id` | 01/11/2026 | Pick one before V4 is written |
-| Q-8 | Is `user_account.must_change_password` still needed, now that invited staff choose their own password? | 01/11/2026 | It may still serve an admin-forced reset |
+| Q-8 | Is `user_account.must_change_password` still needed, now that invited staff choose their own password? | 01/11/2026 | Answered by D-023: only for an admin-forced reset |
