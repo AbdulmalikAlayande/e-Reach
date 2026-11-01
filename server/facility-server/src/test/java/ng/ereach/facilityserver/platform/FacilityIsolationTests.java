@@ -54,7 +54,7 @@ public class FacilityIsolationTests extends PostgresIntegrationTest {
 		transaction = new TransactionTemplate(new JpaTransactionManager(entityManagerFactory));
 		databaseTableOwner = new JdbcTemplate(new DriverManagerDataSource(databaseUrl, "ereach_owner", "ereach_owner"));
 		
-		databaseTableOwner.execute("TRUNCATE facility_setting, clinic, facility, lga, state");
+		databaseTableOwner.execute("TRUNCATE role_assignment, facility_membership, user_security_key, facility_setting, clinic, facility, lga, state");
 		databaseTableOwner.update("INSERT INTO state (code, name) VALUES ('LA', 'Lagos'), ('OG', 'Ogun')");
 		databaseTableOwner.update("""
 			INSERT INTO lga (code, state_code, name)
