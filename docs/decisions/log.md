@@ -141,6 +141,11 @@ A username belongs to its user, so it is kept exactly as they typed it: 3 to 40 
 **Still to build:** sign-in and the sign-in throttle must compare usernames ignoring case too, or a changed capital would get round the backoff (ADR-007).
 **See:** V3, `UserAccountSchemaRulesTests` (TC-007-27, TC-007-62).
 
+### D-022 · 01/11/2026 · Every person account has an email address · Built (schema)
+Email is required for every person, the platform operator included, because an organisation's software needs it for invitations, email codes and notices, even when the server is offline most of the time. It is stored in lower case and belongs to one live account. Phone stays optional. System accounts never have one.
+**Replaces:** PRD F2 step 1, "full name, email or phone", and D-008's list of what the installer asks for, which had no email.
+**See:** V3 (`ck_user_account_person_email`, `ux_user_account_email`), TC-007-63, TC-007-64.
+
 ---
 
 ## Tests
