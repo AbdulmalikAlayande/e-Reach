@@ -75,9 +75,9 @@ class UserAccountSchemaRulesTests extends PostgresIntegrationTest {
 
 		// When a person flagged as platform operator is inserted, without author columns.
 		FacilityContext.runWithContext(installer, () -> transaction.executeWithoutResult(_ -> jdbcTemplate.update("""
-				INSERT INTO user_account (id, kind, username, full_name, password_hash, pin_hash,
+				INSERT INTO user_account (id, kind, username, full_name, email, password_hash, pin_hash,
 				                          must_change_password, is_platform_operator, mfa_required_by)
-				VALUES (?, 'person', 'amina.bello', 'Amina Bello', ?, ?, false, true, now())
+				VALUES (?, 'person', 'amina.bello', 'Amina Bello', 'amina.bello@primexhospital.ng', ?, ?, false, true, now())
 				""", operatorId, PASSWORD_HASH, PIN_HASH)));
 
 		// Then it is stored as an active person who is an operator, written by the INSTALLER.
@@ -104,8 +104,8 @@ class UserAccountSchemaRulesTests extends PostgresIntegrationTest {
 		// When a person with no password hash is inserted.
 		DataAccessException exception = assertThrows(DataAccessException.class,
 				() -> FacilityContext.runWithContext(installer, () -> transaction.executeWithoutResult(_ -> jdbcTemplate.update("""
-						INSERT INTO user_account (id, kind, username, full_name, pin_hash)
-						VALUES (?, 'person', 'amina.bello', 'Amina Bello', ?)
+						INSERT INTO user_account (id, kind, username, full_name, email, pin_hash)
+						VALUES (?, 'person', 'amina.bello', 'Amina Bello', 'amina.bello@primexhospital.ng', ?)
 						""", UserId.newId().uuid(), PIN_HASH))));
 
 		// Then the password check refuses it.
@@ -130,8 +130,8 @@ class UserAccountSchemaRulesTests extends PostgresIntegrationTest {
 		assertAll(Arrays.stream(refused).map(username -> (Executable) () -> {
 			DataAccessException exception = assertThrows(DataAccessException.class,
 					() -> FacilityContext.runWithContext(installer, () -> transaction.executeWithoutResult(_ -> jdbcTemplate.update("""
-							INSERT INTO user_account (id, kind, username, full_name, password_hash)
-							VALUES (?, 'person', ?, 'Amina Bello', ?)
+							INSERT INTO user_account (id, kind, username, full_name, email, password_hash)
+							VALUES (?, 'person', ?, 'Amina Bello', 'amina.bello@primexhospital.ng', ?)
 							""", UserId.newId().uuid(), username, PASSWORD_HASH))),
 					"\"" + username + "\" must be refused");
 			assertEquals("23514", sqlCause(exception).getSQLState(), username);
@@ -139,8 +139,8 @@ class UserAccountSchemaRulesTests extends PostgresIntegrationTest {
 
 		// And Amina.Bello is stored exactly as typed.
 		FacilityContext.runWithContext(installer, () -> transaction.executeWithoutResult(_ -> jdbcTemplate.update("""
-				INSERT INTO user_account (id, kind, username, full_name, password_hash)
-				VALUES (?, 'person', 'Amina.Bello', 'Amina Bello', ?)
+				INSERT INTO user_account (id, kind, username, full_name, email, password_hash)
+				VALUES (?, 'person', 'Amina.Bello', 'Amina Bello', 'amina.bello@primexhospital.ng', ?)
 				""", typedWithCapitalsId, PASSWORD_HASH)));
 		assertEquals("Amina.Bello",
 				jdbcTemplate.queryForObject("SELECT username FROM user_account WHERE id = ?", String.class, typedWithCapitalsId));
@@ -156,15 +156,15 @@ class UserAccountSchemaRulesTests extends PostgresIntegrationTest {
 		// Given a person named Amina.Bello.
 		FacilityContext installer = FacilityContext.forUserOnly(SystemActors.INSTALLER);
 		FacilityContext.runWithContext(installer, () -> transaction.executeWithoutResult(_ -> jdbcTemplate.update("""
-				INSERT INTO user_account (id, kind, username, full_name, password_hash)
-				VALUES (?, 'person', 'Amina.Bello', 'Amina Bello', ?)
+				INSERT INTO user_account (id, kind, username, full_name, email, password_hash)
+				VALUES (?, 'person', 'Amina.Bello', 'Amina Bello', 'amina.bello@primexhospital.ng', ?)
 				""", UserId.newId().uuid(), PASSWORD_HASH)));
 
 		// When a person named amina.bello is inserted.
 		DataAccessException exception = assertThrows(DataAccessException.class,
 				() -> FacilityContext.runWithContext(installer, () -> transaction.executeWithoutResult(_ -> jdbcTemplate.update("""
-						INSERT INTO user_account (id, kind, username, full_name, password_hash)
-						VALUES (?, 'person', 'amina.bello', 'Another Amina', ?)
+						INSERT INTO user_account (id, kind, username, full_name, email, password_hash)
+						VALUES (?, 'person', 'amina.bello', 'Another Amina', 'another.amina@primexhospital.ng', ?)
 						""", UserId.newId().uuid(), PASSWORD_HASH))));
 
 		// Then the case-insensitive unique index refuses it.
@@ -185,8 +185,8 @@ class UserAccountSchemaRulesTests extends PostgresIntegrationTest {
 		// When a person with the username system.installer is inserted.
 		DataAccessException exception = assertThrows(DataAccessException.class,
 				() -> FacilityContext.runWithContext(installer, () -> transaction.executeWithoutResult(_ -> jdbcTemplate.update("""
-						INSERT INTO user_account (id, kind, username, full_name, password_hash)
-						VALUES (?, 'person', 'system.installer', 'Amina Bello', ?)
+						INSERT INTO user_account (id, kind, username, full_name, email, password_hash)
+						VALUES (?, 'person', 'system.installer', 'Amina Bello', 'amina.bello@primexhospital.ng', ?)
 						""", UserId.newId().uuid(), PASSWORD_HASH))));
 
 		// Then the unique username index refuses it.
@@ -208,12 +208,12 @@ class UserAccountSchemaRulesTests extends PostgresIntegrationTest {
 		// When a person with a local number, then one with an international number, is inserted.
 		DataAccessException exception = assertThrows(DataAccessException.class,
 				() -> FacilityContext.runWithContext(installer, () -> transaction.executeWithoutResult(_ -> jdbcTemplate.update("""
-						INSERT INTO user_account (id, kind, username, full_name, phone, password_hash)
-						VALUES (?, 'person', 'amina.bello', 'Amina Bello', '08031234567', ?)
+						INSERT INTO user_account (id, kind, username, full_name, email, phone, password_hash)
+						VALUES (?, 'person', 'amina.bello', 'Amina Bello', 'amina.bello@primexhospital.ng', '08031234567', ?)
 						""", UserId.newId().uuid(), PASSWORD_HASH))));
 		FacilityContext.runWithContext(installer, () -> transaction.executeWithoutResult(_ -> jdbcTemplate.update("""
-				INSERT INTO user_account (id, kind, username, full_name, phone, password_hash)
-				VALUES (?, 'person', 'amina.bello', 'Amina Bello', '+2348031234567', ?)
+				INSERT INTO user_account (id, kind, username, full_name, email, phone, password_hash)
+				VALUES (?, 'person', 'amina.bello', 'Amina Bello', 'amina.bello@primexhospital.ng', '+2348031234567', ?)
 				""", storedId, PASSWORD_HASH)));
 
 		// Then the local number is refused and the international one is stored.
@@ -261,8 +261,8 @@ class UserAccountSchemaRulesTests extends PostgresIntegrationTest {
 		// When a person is inserted without author columns.
 		DataAccessException exception = assertThrows(DataAccessException.class,
 				() -> transaction.executeWithoutResult(_ -> jdbcTemplate.update("""
-						INSERT INTO user_account (id, kind, username, full_name, password_hash)
-						VALUES (?, 'person', 'amina.bello', 'Amina Bello', ?)
+						INSERT INTO user_account (id, kind, username, full_name, email, password_hash)
+						VALUES (?, 'person', 'amina.bello', 'Amina Bello', 'amina.bello@primexhospital.ng', ?)
 						""", UserId.newId().uuid(), PASSWORD_HASH)));
 
 		// Then the database refuses it because created_by has no value.
@@ -290,12 +290,12 @@ class UserAccountSchemaRulesTests extends PostgresIntegrationTest {
 					VALUES (?, 'Primex Hospital', 'secondary', 'LA', 'LA-01', 'PH')
 					""", facilityId.uuid());
 			jdbcTemplate.update("""
-					INSERT INTO user_account (id, kind, username, full_name, password_hash)
-					VALUES (?, 'person', 'chidi.okafor', 'Chidi Okafor', ?)
+					INSERT INTO user_account (id, kind, username, full_name, email, password_hash)
+					VALUES (?, 'person', 'chidi.okafor', 'Chidi Okafor', 'chidi.okafor@primexhospital.ng', ?)
 					""", doctorId, PASSWORD_HASH);
 			jdbcTemplate.update("""
-					INSERT INTO user_account (id, kind, username, full_name, password_hash, is_platform_operator)
-					VALUES (?, 'person', 'amina.bello', 'Amina Bello', ?, true)
+					INSERT INTO user_account (id, kind, username, full_name, email, password_hash, is_platform_operator)
+					VALUES (?, 'person', 'amina.bello', 'Amina Bello', 'amina.bello@primexhospital.ng', ?, true)
 					""", operatorId.uuid(), PASSWORD_HASH);
 		}));
 		FacilityContext.runWithContext(inFacility, () -> transaction.executeWithoutResult(_ -> {
@@ -341,8 +341,8 @@ class UserAccountSchemaRulesTests extends PostgresIntegrationTest {
 					VALUES (?, 'Primex Hospital', 'secondary', 'LA', 'LA-01', 'PH')
 					""", facilityId.uuid());
 			jdbcTemplate.update("""
-					INSERT INTO user_account (id, kind, username, full_name, password_hash)
-					VALUES (?, 'person', 'amina.bello', 'Amina Bello', ?)
+					INSERT INTO user_account (id, kind, username, full_name, email, password_hash)
+					VALUES (?, 'person', 'amina.bello', 'Amina Bello', 'amina.bello@primexhospital.ng', ?)
 					""", personId, PASSWORD_HASH);
 		}));
 		FacilityContext.runWithContext(inFacility, () -> transaction.executeWithoutResult(_ -> jdbcTemplate.update("""
@@ -360,4 +360,57 @@ class UserAccountSchemaRulesTests extends PostgresIntegrationTest {
 		assertTrue(sqlCause(exception).getMessage().contains("role_code"), sqlCause(exception).getMessage());
 	}
 
+	/**
+	 * <p>Level: Integration</p>
+	 * <p>Traces to: D-022 (every person has an email), V3 (ck_user_account_person_email)</p>
+	 */
+	@Test
+	@DisplayName("TC-007-63 | A person account without an email is refused")
+	void personMustHaveAnEmail() {
+		// Given the installer's context.
+		FacilityContext installer = FacilityContext.forUserOnly(SystemActors.INSTALLER);
+
+		// When a person with a password but no email is inserted.
+		DataAccessException exception = assertThrows(DataAccessException.class,
+				() -> FacilityContext.runWithContext(installer, () -> transaction.executeWithoutResult(_ -> jdbcTemplate.update("""
+						INSERT INTO user_account (id, kind, username, full_name, password_hash)
+						VALUES (?, 'person', 'amina.bello', 'Amina Bello', ?)
+						""", UserId.newId().uuid(), PASSWORD_HASH))));
+
+		// Then the email check refuses it.
+		assertEquals("23514", sqlCause(exception).getSQLState());
+		assertTrue(sqlCause(exception).getMessage().contains("ck_user_account_person_email"), sqlCause(exception).getMessage());
+	}
+
+	/**
+	 * <p>Level: Integration</p>
+	 * <p>Traces to: D-022, V3 (email in lower case, ux_user_account_email)</p>
+	 */
+	@Test
+	@DisplayName("TC-007-64 | An email is stored in lower case and belongs to one live account")
+	void emailIsLowerCaseAndUsedOnce() {
+		// Given the installer's context and a person with amina.bello@primexhospital.ng.
+		FacilityContext installer = FacilityContext.forUserOnly(SystemActors.INSTALLER);
+		FacilityContext.runWithContext(installer, () -> transaction.executeWithoutResult(_ -> jdbcTemplate.update("""
+				INSERT INTO user_account (id, kind, username, full_name, email, password_hash)
+				VALUES (?, 'person', 'amina.bello', 'Amina Bello', 'amina.bello@primexhospital.ng', ?)
+				""", UserId.newId().uuid(), PASSWORD_HASH)));
+
+		// When a person with Chidi.Okafor@PrimexHospital.ng, then another with Amina's address, is inserted.
+		DataAccessException capitals = assertThrows(DataAccessException.class,
+				() -> FacilityContext.runWithContext(installer, () -> transaction.executeWithoutResult(_ -> jdbcTemplate.update("""
+						INSERT INTO user_account (id, kind, username, full_name, email, password_hash)
+						VALUES (?, 'person', 'chidi.okafor', 'Chidi Okafor', 'Chidi.Okafor@PrimexHospital.ng', ?)
+						""", UserId.newId().uuid(), PASSWORD_HASH))));
+		DataAccessException reused = assertThrows(DataAccessException.class,
+				() -> FacilityContext.runWithContext(installer, () -> transaction.executeWithoutResult(_ -> jdbcTemplate.update("""
+						INSERT INTO user_account (id, kind, username, full_name, email, password_hash)
+						VALUES (?, 'person', 'chidi.okafor', 'Chidi Okafor', 'amina.bello@primexhospital.ng', ?)
+						""", UserId.newId().uuid(), PASSWORD_HASH))));
+
+		// Then the capitals are refused by the email check, and the reused address by the unique email index.
+		assertEquals("23514", sqlCause(capitals).getSQLState());
+		assertEquals("23505", sqlCause(reused).getSQLState());
+		assertTrue(sqlCause(reused).getMessage().contains("ux_user_account_email"), sqlCause(reused).getMessage());
+	}
 }
