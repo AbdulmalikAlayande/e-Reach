@@ -62,6 +62,12 @@
 		</dependency>
 
 		<dependency>
+			<!-- Draws the authenticator QR code (D-027); the tests read it back. -->
+			<groupId>com.google.zxing</groupId>
+			<artifactId>core</artifactId>
+			<version>3.5.3</version>
+		</dependency>
+		<dependency>
 			<groupId>org.postgresql</groupId>
 			<artifactId>postgresql</artifactId>
 			<scope>runtime</scope>
