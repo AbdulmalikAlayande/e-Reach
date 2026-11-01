@@ -114,7 +114,7 @@ We write Given-When-Then in this book but implement each case as a JUnit test, n
 | TC-006-02 | An empty setting counts as none | app.facility\_id set to the empty text '' | clinic and facility\_setting are counted | Both counts are 0 | Integration | Rule 1 | FacilityIsolationTests | Passing |
 | TC-006-03 | Facility A sees only its own rows | A set | clinics are listed and settings counted | Exactly GOPD A and ANC A; 1 setting | Integration | F1, rule 1, ADR-003 | FacilityIsolationTests | Passing |
 | TC-006-04 | An unknown facility sees nothing | app.facility\_id set to a UUID that no facility has | clinics are counted | The count is 0 | Integration | Rule 1 | FacilityIsolationTests | Passing |
-| TC-006-05 | A malformed setting fails loudly | app.facility\_id set to 'not-a-uuid' | clinics are selected | The query fails with an invalid-UUID error; no rows are returned | Integration | Rule 1 | FacilityIsolationTests | Passing |
+| TC-006-05 | A malformed setting fails loudly | app.facility\_id set to 'not-a-uuid' | clinics are selected | The query fails with an invalid-UUID error; no rows are returned | Integration | Rule 1 | FacilityIsolationTests | Passing (01/11/2026; the test body was empty before) |
 | TC-006-06 | The setting ends with its transaction | One connection: A set, clinics counted, transaction committed | clinics are counted again on the same connection | 2 inside the transaction, 0 after it | Integration | F1, rule 1 | FacilityIsolationTests | Passing |
 | TC-006-07 | No row can be written for another facility | A set | a clinic stamped with B is inserted | Refused: new row violates row-level security policy | Integration | Rule 1, ADR-003 | FacilityIsolationTests | Passing |
 | TC-006-08 | No row can be written with no facility set | No facility set | a clinic stamped with A is inserted | Refused: new row violates row-level security policy | Integration | Rule 1 | FacilityIsolationTests | Passing |
@@ -135,7 +135,7 @@ We write Given-When-Then in this book but implement each case as a JUnit test, n
 | TC-006-23 | Registration number and agency come together | None | facilities are inserted with a number only, an agency only, and both | The first two refused by facility\_check; the third accepted | Integration | F1 | PlatformSchemaRulesTests | Passing |
 | TC-006-24 | A facility's LGA lies in its state | States LA and OG, each with one LGA | a facility with state LA and an Ogun LGA is inserted | Refused: fk\_facility\_lga | Integration | F1, Batch 2 V2 | PlatformSchemaRulesTests | Passing |
 | TC-006-25 | Facility type is a closed list | None | a facility of type 'hospital' is inserted | Refused: facility\_type\_check | Integration | F1 | PlatformSchemaRulesTests | Passing |
-| TC-006-26 | Unknown setting keys are refused | A set | a setting with key 'foo.bar' is inserted | Refused: facility\_setting\_key\_check | Integration | F1 | PlatformSchemaRulesTests | Passing |
+| TC-006-26 | Unknown setting keys are refused | A set | a setting with key 'foo.bar' is inserted | Refused: facility\_setting\_key\_check | Integration | F1 | PlatformSchemaRulesTests | Passing (01/11/2026; before, the test used columns that do not exist) |
 | TC-006-27 | One value per setting key per facility | A set; A already has lab.verification\_required | a second lab.verification\_required is inserted | Refused: ux\_facility\_setting\_key | Integration | F1 | PlatformSchemaRulesTests | Passing |
 | TC-006-28 | Reference tables are read-only for the application | None | the application inserts into state and updates lga | Both refused: permission denied | Integration | F1, Batch 2 V2 | PlatformSchemaRulesTests | Passing |
 
@@ -172,7 +172,7 @@ Every Then above was checked by running it on a real PostgreSQL before it was wr
 | TC-006-51 | A read-only transaction gets the context too | Context: facility A | a read-only transaction reads clinics | app.facility\_id is A, only A's clinics | Integration | Rule 1 | TransactionContextHookTest | Passing |
 | TC-006-52 | No transaction, no context | A in the holder, no transaction | clinics are read | 0 rows: the context only arrives through the transaction manager | Integration | Rule 1 | TransactionContextHookTest | Passing |
 | TC-006-53 | The facility table needs no context | No context | the facility table is read | Both facilities come back (facility has no RLS) | Integration | F1, F2 | TransactionContextHookTest | Passing |
-| TC-006-54 | The hook breaks nothing else | The hook is the application's transaction manager | mvnw verify runs the whole build | Every test passes | Build | Section 7 | The whole build | Failing |
+| TC-006-54 | The hook breaks nothing else | The hook is the application's transaction manager | mvnw verify runs the whole build | Every test passes | Build | Section 7 | The whole build | Passing (01/11/2026) |
 | TC-006-55 | A failed context fails the transaction cleanly | The context statement fails | a transaction starts | CannotCreateTransactionException with the real cause inside; nothing left bound to the thread; the next transaction works | Integration | Rule 1 | TransactionContextHookTest | Failing |
 
 Statuses come from the developer's run of 26/10/2026. V2 has changed since, so the next full run confirms them.
@@ -183,12 +183,12 @@ Statuses come from the developer's run of 26/10/2026. V2 has changed since, so t
 
 | ID | Checks | Given | When | Then | Level | Traces to | Class | Status |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| TC-006-56 | No author, no write | No user in the context | a facility is inserted | Refused with 23502 | Integration | Rule 19, ADR-018 | AuthorColumnsTests | Written |
-| TC-006-57 | The database fills the author columns | User A in the context | a clinic is inserted | created\_by and updated\_by are A; created\_at equals updated\_at | Integration | Rule 19, ADR-018 | AuthorColumnsTests | Written |
-| TC-006-58 | Every update records its author | A clinic created by A | user B updates it | updated\_by is B and updated\_at is later; created\_by is still A | Integration | Rule 19, ADR-018 | AuthorColumnsTests | Written |
-| TC-006-59 | The creator cannot be rewritten | A clinic created by A | an update sets created\_by to B | created\_by is still A | Integration | Rule 19, ADR-018 | AuthorColumnsTests | Written |
-| TC-006-60 | System actor IDs are fixed | SystemActors in shared | its four IDs are read | Each equals its fixed value (…0001 to …0004, as inserted by V3); all four differ; all are version 7 | Unit | Rule 19, ADR-018 | SystemActorsTests (facility-server, `platform` package) | Written |
-| TC-006-61 | A setting survives a save and a load | A facility context with a user | a true/false setting and a whole-number setting are saved through JPA and read back in a new transaction | PostgreSQL holds a JSON boolean and a JSON number; the entity returns the same values and key; created\_by is the user; row\_version is 0 | Integration | F1, section 9 | FacilitySettingMappingTests | Written |
+| TC-006-56 | No author, no write | No user in the context | a facility is inserted | Refused with 23502 | Integration | Rule 19, ADR-018 | AuthorColumnsTests | Passing (01/11/2026) |
+| TC-006-57 | The database fills the author columns | User A in the context | a clinic is inserted | created\_by and updated\_by are A; created\_at equals updated\_at | Integration | Rule 19, ADR-018 | AuthorColumnsTests | Passing (01/11/2026) |
+| TC-006-58 | Every update records its author | A clinic created by A | user B updates it | updated\_by is B and updated\_at is later; created\_by is still A | Integration | Rule 19, ADR-018 | AuthorColumnsTests | Passing (01/11/2026) |
+| TC-006-59 | The creator cannot be rewritten | A clinic created by A | an update sets created\_by to B | created\_by is still A | Integration | Rule 19, ADR-018 | AuthorColumnsTests | Passing (01/11/2026) |
+| TC-006-60 | System actor IDs are fixed | SystemActors in shared | its four IDs are read | Each equals its fixed value (…0001 to …0004, as inserted by V3); all four differ; all are version 7 | Unit | Rule 19, ADR-018 | SystemActorsTests (facility-server, `platform` package) | Passing (01/11/2026) |
+| TC-006-61 | A setting survives a save and a load | A facility context with a user | a true/false setting and a whole-number setting are saved through JPA and read back in a new transaction | PostgreSQL holds a JSON boolean and a JSON number; the entity returns the same values and key; created\_by is the user; row\_version is 0 | Integration | F1, section 9 | FacilitySettingMappingTests | Passing (01/11/2026; settles the Hibernate and Jackson 3 JsonNode question) |
 
 ## Traceability
 
