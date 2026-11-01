@@ -62,6 +62,12 @@
 		</dependency>
 
 		<dependency>
+			<!-- Argon2id for passwords and PINs (ADR-007): Spring Security's Argon2PasswordEncoder needs it. -->
+			<groupId>org.bouncycastle</groupId>
+			<artifactId>bcprov-jdk18on</artifactId>
+			<version>1.83</version>
+		</dependency>
+		<dependency>
 			<!-- Draws the authenticator QR code (D-027); the tests read it back. -->
 			<groupId>com.google.zxing</groupId>
 			<artifactId>core</artifactId>
