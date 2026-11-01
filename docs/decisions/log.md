@@ -199,6 +199,10 @@ A missing or wrong setup code is 403 `ACCESS_DENIED`; once a confirmed operator 
 **Replaces:** the setup code of D-029 (`X-Setup-Code`, `EREACH_SETUP_CODE`, the 403 for a missing or wrong code, the 404 when no code is configured) and its "first-run screen" wording.
 **See:** TC-007-34 to TC-007-61.
 
+### D-032 · 01/11/2026 · The joining code carries the facility server's address · Decided
+An invitation's joining code, and the link in its email, carry the facility server's address as well as the secret, so a newly installed app learns which server to connect to by accepting the invitation. Nobody types or searches for an address to join. The code's format, length and expiry are still open (Q-6).
+**See:** D-010, PRD F2 step 3.
+
 ---
 
 ## Tests
@@ -221,6 +225,6 @@ A test that creates person accounts truncates `mfa_challenge, mfa_method, practi
 | Q-3 | Allowed ranges for `session.idle_lock_minutes` and `session.max_hours` | 27/10/2026 | PRD F1 |
 | Q-4 | Which desktop wrapper | 28/10/2026 | Developer's choice; WebAuthn inside its webview must be tested before relying on it |
 | Q-5 | Which WebAuthn library | 01/11/2026 | See D-016 |
-| Q-6 | Invitation table, code format and expiry | 28/10/2026 | ER-007 |
+| Q-6 | Invitation table, code format and expiry | 28/10/2026 | ER-007; the code must also carry the server's address (D-032) |
 | Q-7 | Column name for a user reference: V3 uses `user_account_id`, the planned V4 to V9 tables use `user_id` | 01/11/2026 | Pick one before V4 is written |
 | Q-8 | Is `user_account.must_change_password` still needed, now that invited staff choose their own password? | 01/11/2026 | Answered by D-023: only for an admin-forced reset |
