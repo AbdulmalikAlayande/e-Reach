@@ -29,8 +29,6 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.security.crypto.argon2.Argon2PasswordEncoder;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import tools.jackson.databind.json.JsonMapper;
@@ -38,7 +36,6 @@ import tools.jackson.databind.json.JsonMapper;
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
-import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.OffsetDateTime;
@@ -63,19 +60,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /**
  * Parts D and E of ER-007, part 1: the installer's first-run step, through the setup endpoints of D-029,
- * against the real application and PostgreSQL. Written before the endpoints exist, so every case fails
+ * against the real application and PostgreSQL: the start screen's "set up a new facility server" path (D-031). Written before the endpoints exist, so every case fails
  * until they do.
  *
- * <p>Every request carries the setup code, a new Idempotency-Key and a CSRF token, unless the case says
- * otherwise. Time is fixed at 01/11/2026 09:00 UTC through the Clock bean, so authenticator codes are exact.
+ * <p>Every request carries a new Idempotency-Key and a CSRF token; there is no setup code (D-031). Time is fixed at 01/11/2026 09:00 UTC through the Clock bean, so authenticator codes are exact.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
 @ExtendWith(OutputCaptureExtension.class)
 class PlatformOperatorSetupTests extends PostgresIntegrationTest {
-
-	/** The code the installer would show on the server's screen; made fresh for each test run (D-029). */
-	static final String SETUP_CODE = newSetupCode();
 
 	/** The fixed moment of every case, and its 30-second authenticator time step. */
 	static final Instant NOW = Instant.parse("2026-11-01T09:00:00Z");
@@ -92,11 +85,6 @@ class PlatformOperatorSetupTests extends PostgresIntegrationTest {
 	private static final String SETUP = "/api/v1/setup/platform-operator";
 	private static final String MFA = SETUP + "/mfa";
 	private static final String CONFIRM = MFA + "/confirm";
-
-	@DynamicPropertySource
-	static void setupCode(DynamicPropertyRegistry registry) {
-		registry.add("ereach.setup.code", () -> SETUP_CODE);
-	}
 
 	@TestConfiguration
 	static class FixedClock {
@@ -131,13 +119,7 @@ class PlatformOperatorSetupTests extends PostgresIntegrationTest {
 
 	// ------------------------------------------------------------------ requests
 
-	private static String newSetupCode() {
-		byte[] code = new byte[16];
-		new SecureRandom().nextBytes(code);
-		return AuthenticatorSecretGenerator.encodeBase32NoPadding(code);
-	}
-
-	/** The JSON the first-run screen sends; a null value is left out, as a screen that never asked for it would. */
+	/** The JSON the setup screen sends; a null value is left out, as a screen that never asked for it would. */
 	private static String operator(String fullName, String username, String email, String password, String pin) {
 		Map<String, Object> body = new LinkedHashMap<>();
 		body.put("fullName", fullName);
@@ -151,25 +133,21 @@ class PlatformOperatorSetupTests extends PostgresIntegrationTest {
 		return JsonMapper.builder().build().writeValueAsString(body);
 	}
 
-	private ResultActions postAsInstaller(String path, String json, String setupCode) throws Exception {
-		var request = post(path).contentType(MediaType.APPLICATION_JSON).content(json)
-				.header("Idempotency-Key", Ids.newId().toString()).with(csrf());
-		if (setupCode != null) {
-			request.header("X-Setup-Code", setupCode);
-		}
-		return mockMvc.perform(request);
+	private ResultActions postAsInstaller(String path, String json) throws Exception {
+		return mockMvc.perform(post(path).contentType(MediaType.APPLICATION_JSON).content(json)
+				.header("Idempotency-Key", Ids.newId().toString()).with(csrf()));
 	}
 
 	private ResultActions createOperator(String json) throws Exception {
-		return postAsInstaller(SETUP, json, SETUP_CODE);
+		return postAsInstaller(SETUP, json);
 	}
 
 	private ResultActions startSetup(String method) throws Exception {
-		return postAsInstaller(MFA, "{\"method\": \"" + method + "\"}", SETUP_CODE);
+		return postAsInstaller(MFA, "{\"method\": \"" + method + "\"}");
 	}
 
 	private ResultActions confirm(String code) throws Exception {
-		return postAsInstaller(CONFIRM, "{\"method\": \"totp\", \"code\": \"" + code + "\"}", SETUP_CODE);
+		return postAsInstaller(CONFIRM, "{\"method\": \"totp\", \"code\": \"" + code + "\"}");
 	}
 
 	/** The authenticator code an app holding this manual key shows at the given time step. */
@@ -690,7 +668,7 @@ class PlatformOperatorSetupTests extends PostgresIntegrationTest {
 
 	/**
 	 * <p>Level: API</p>
-	 * <p>Traces to: F2 acceptance criterion ("no password, PIN or TOTP secret appears in logs"), D-029</p>
+	 * <p>Traces to: F2 acceptance criterion ("no password, PIN or TOTP secret appears in logs")</p>
 	 */
 	@Test
 	@DisplayName("TC-007-57 | Nothing secret reaches the logs during the whole step")
@@ -709,7 +687,6 @@ class PlatformOperatorSetupTests extends PostgresIntegrationTest {
 		String logs = output.getAll();
 		assertFalse(logs.contains(PASSWORD), "The password reached the logs");
 		assertFalse(logs.contains(pin), "The PIN reached the logs");
-		assertFalse(logs.contains(SETUP_CODE), "The setup code reached the logs");
 		assertFalse(logs.contains(key), "The authenticator key reached the logs");
 		assertFalse(logs.contains("otpauth://"), "A provisioning URI reached the logs");
 		assertFalse(logs.contains(image.substring(22, 82)), "The QR image reached the logs");
@@ -720,7 +697,7 @@ class PlatformOperatorSetupTests extends PostgresIntegrationTest {
 	 * <p>Traces to: F2</p>
 	 */
 	@Test
-	@DisplayName("TC-007-58 | The creation answer holds no password, PIN, hash or setup code")
+	@DisplayName("TC-007-58 | The creation answer holds no password, PIN or hash")
 	void creationAnswerHoldsNoSecrets() throws Exception {
 		// Given a new server.
 
@@ -733,14 +710,13 @@ class PlatformOperatorSetupTests extends PostgresIntegrationTest {
 		assertFalse(answer.contains("\"" + PIN + "\""));
 		assertFalse(answer.contains("$argon2id$"));
 		assertFalse(answer.toLowerCase().contains("hash"));
-		assertFalse(answer.contains(SETUP_CODE));
 	}
 
 	// ------------------------------------------------------------------ part E: the way in
 
 	/**
 	 * <p>Level: API</p>
-	 * <p>Traces to: F1 acceptance criterion 1, D-029</p>
+	 * <p>Traces to: F1 acceptance criterion 1, D-029, D-031</p>
 	 */
 	@Test
 	@DisplayName("TC-007-59 | Every setup endpoint answers 404 once the first operator is confirmed")
@@ -750,7 +726,7 @@ class PlatformOperatorSetupTests extends PostgresIntegrationTest {
 		String key = read(startSetup("totp").andExpect(status().isOk()), "$.manualEntryKey");
 		confirm(codeFor(key, NOW_STEP)).andExpect(status().isOk());
 
-		// When each setup endpoint is called with the right setup code.
+		// When each setup endpoint is called.
 		// Then each is not found.
 		createOperator(operator("Chidi Okafor", "chidi.okafor", "chidi.okafor@primexhospital.ng", PASSWORD, PIN))
 				.andExpect(status().isNotFound());
@@ -802,41 +778,4 @@ class PlatformOperatorSetupTests extends PostgresIntegrationTest {
 				.andExpect(jsonPath("$.code").value("USERNAME_TAKEN"));
 	}
 
-	/**
-	 * <p>Level: API</p>
-	 * <p>Traces to: D-029</p>
-	 */
-	@Test
-	@DisplayName("TC-007-65 | Without the setup code the step is refused")
-	void noSetupCodeNoSetup() throws Exception {
-		// Given a new server.
-
-		// When the step runs without X-Setup-Code.
-		postAsInstaller(SETUP, operator(FULL_NAME, USERNAME, EMAIL, PASSWORD, PIN), null)
-				// Then it is refused, and nothing is saved.
-				.andExpect(status().isForbidden())
-				.andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
-		assertEquals(0, personAccounts());
-	}
-
-	/**
-	 * <p>Level: API</p>
-	 * <p>Traces to: D-029</p>
-	 */
-	@Test
-	@DisplayName("TC-007-66 | A wrong setup code is refused without revealing the right one")
-	void wrongSetupCodeIsRefused() throws Exception {
-		// Given a new server, and a code that is not the installer's.
-		String wrongCode = newSetupCode();
-
-		// When the step runs with it.
-		String answer = postAsInstaller(SETUP, operator(FULL_NAME, USERNAME, EMAIL, PASSWORD, PIN), wrongCode)
-				.andExpect(status().isForbidden())
-				.andExpect(jsonPath("$.code").value("ACCESS_DENIED"))
-				.andReturn().getResponse().getContentAsString();
-
-		// Then the right code is not in the answer, and nothing is saved.
-		assertFalse(answer.contains(SETUP_CODE));
-		assertEquals(0, personAccounts());
-	}
 }
