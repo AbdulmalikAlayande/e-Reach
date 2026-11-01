@@ -41,6 +41,9 @@ public abstract class TypedIdJavaType<T> extends AbstractClassJavaType<T> {
 		if (value == null) {
 			return null;
 		}
+		if (type.isInstance(value)) {
+			return type.cast(value); // Hibernate asks for the typed ID itself, for example when binding an entity parameter
+		}
 		UUID uuid = toUuid.apply(value);
 		if (UUID.class.isAssignableFrom(type)) {
 			return type.cast(uuid);
@@ -55,6 +58,9 @@ public abstract class TypedIdJavaType<T> extends AbstractClassJavaType<T> {
 	public <X> T wrap(X value, WrapperOptions options) {
 		if (value == null) {
 			return null;
+		}
+		if (getJavaTypeClass().isInstance(value)) {
+			return getJavaTypeClass().cast(value); // already the typed ID, for example an entity parameter's key
 		}
 		if (value instanceof UUID uuid) {
 			return fromUuid.apply(uuid);
