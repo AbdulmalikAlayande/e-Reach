@@ -117,9 +117,9 @@ CREATE TABLE facility (
   deleted_at   timestamptz
 );
 -- Full (not partial) unique: a prefix is never reused, even by a deleted facility.
-CREATE UNIQUE INDEX ux_facility_prefix ON facility (hospital_number_prefix);
+CREATE UNIQUE INDEX ux_facility_prefix ON facility (hospital_number_prefix) WHERE deleted_at IS NULL;
 -- NULLs never clash, so facilities without a national code are allowed.
-CREATE UNIQUE INDEX ux_facility_nhfr_code ON facility (nhfr_code);
+CREATE UNIQUE INDEX ux_facility_nhfr_code ON facility (nhfr_code) WHERE deleted_at IS NULL;
 CREATE TRIGGER tg_facility_audit_columns BEFORE UPDATE ON facility
   FOR EACH ROW EXECUTE FUNCTION set_audit_columns();
 
