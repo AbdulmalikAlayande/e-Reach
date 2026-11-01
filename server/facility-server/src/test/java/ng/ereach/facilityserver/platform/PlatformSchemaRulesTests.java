@@ -472,7 +472,9 @@ class PlatformSchemaRulesTests extends PostgresIntegrationTest {
 			DataSource dataSource = Objects.requireNonNull(database.getDataSource());
 			Connection connection = DataSourceUtils.getConnection(dataSource);
 			try (Statement statement = connection.createStatement()) {
-				statement.execute("SELECT set_config('app.facility_id', '" + facilityId + "', true)");
+				// Both settings, as the application's transaction hook sets them: updates need app.user_id (rule 19).
+				statement.execute("SELECT set_config('app.facility_id', '" + facilityId + "', true), "
+						+ "set_config('app.user_id', '" + currentUserId + "', true)");
 			} catch (SQLException exception) {
 				throw new RuntimeException("Failed to set facility session context", exception);
 			} finally {
