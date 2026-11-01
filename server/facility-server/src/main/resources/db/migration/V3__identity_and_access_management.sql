@@ -7,7 +7,7 @@ CREATE TABLE user_account (
     email                   TEXT CHECK (email = lower(email) AND email ~ '^[^@\s]+@[^@\s]+\.[^@\s]+$'),
     phone                   TEXT CHECK (phone ~ '^\+[1-9][0-9]{6,14}$'),
     password_hash           TEXT,
-    must_change_password    BOOLEAN NOT NULL DEFAULT true,-- true while the one-time password is in use
+    must_change_password    BOOLEAN NOT NULL DEFAULT false, -- true only after an admin forces a reset; nobody gets a temporary password (D-023)
     pin_hash                TEXT,
     mfa_required_by         TIMESTAMPTZ,-- end of a clinician's 30-day grace period, they must have a confirmed MFA method by then
     status                  TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'suspended')),
