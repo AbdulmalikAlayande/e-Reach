@@ -170,6 +170,14 @@ The operator chooses an authenticator app, an email code or a passkey, like ever
 The server draws the authenticator QR code itself (transcript of 01/11/2026) as a PNG, sent as a `data:image/png;base64,` image in `MfaResponse.qrCodeImage`, using `com.google.zxing:core` 3.5.3 (Apache 2.0, no dependencies of its own). The tests decode the same PNG with ZXing to check the provisioning URI inside it. ZXing is understood to be in maintenance mode, taking bug fixes only, which is enough for drawing a QR code; this was not checked against the project's current statement.
 **See:** `facility-server/pom.xml`, TC-007-47.
 
+### D-028 · 01/11/2026 · Every staff role needs MFA; elevated roles need it at once · Decided
+- At once (`mfa_required_by` is the moment the account is made or the role is given): platform operators, `facility_admin` and `data_protection_lead`, because they control access and the audit trail.
+- Within 30 days of getting the role: every other role, including `records_officer`, `cashier`, `accounts_officer`, `insurance_officer` and `medical_director`.
+- `mfa_required_by` belongs to the person while roles belong to memberships, so it is the earliest deadline any of their roles sets, and gaining an elevated role moves it to that moment unless MFA is already confirmed.
+- Before the deadline a user without MFA has no MFA way past a sign-in backoff (PRD F2). From the deadline, sign-in cannot finish until they set MFA up.
+This answers Q-1.
+**Replaces:** PRD F2 and ADR-007, which required MFA only for clinical and admin roles.
+
 ---
 
 ## Tests
@@ -183,7 +191,7 @@ Every `@BeforeEach` that empties tables must include `role_assignment, facility_
 
 | # | Question | Raised | Notes |
 | --- | --- | --- | --- |
-| Q-1 | Does `medical_director` require MFA? | 27/10/2026 | PRD F2 lists clinical roles, `facility_admin`, `data_protection_lead` and `platform_operator` |
+| Q-1 | Does `medical_director` require MFA? | 27/10/2026 | Answered by D-028: yes, within 30 days, like every role that is not elevated |
 | Q-2 | Backoff figures: first delay, growth, ceiling | 22/10/2026 | To be set in ER-007 |
 | Q-3 | Allowed ranges for `session.idle_lock_minutes` and `session.max_hours` | 27/10/2026 | PRD F1 |
 | Q-4 | Which desktop wrapper | 28/10/2026 | Developer's choice; WebAuthn inside its webview must be tested before relying on it |
