@@ -9,7 +9,7 @@ CREATE TABLE user_account (
     password_hash           TEXT,
     must_change_password    BOOLEAN NOT NULL DEFAULT false, -- true only after an admin forces a reset; nobody gets a temporary password (D-023)
     pin_hash                TEXT,
-    mfa_required_by         TIMESTAMPTZ,-- end of a clinician's 30-day grace period, they must have a confirmed MFA method by then
+    mfa_required_by         TIMESTAMPTZ,-- by when a confirmed MFA method is needed: at once for elevated roles, 30 days for every other role (D-028)
     status                  TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'suspended')),
     is_platform_operator    BOOLEAN NOT NULL DEFAULT false,
     created_at              TIMESTAMPTZ NOT NULL DEFAULT now(),
