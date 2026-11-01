@@ -52,8 +52,8 @@ We write Given-When-Then in this book but implement each case as a JUnit test, n
 
 | ID | Checks | Given | When | Then | Level | Traces to | Status |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| TC-004-01 | The shared module is part of the build | `server/pom.xml` lists `shared`, and `facility-server` depends on `shared` | `.\mvnw.cmd validate` runs in `server/` | The reactor lists e-Reach, then ereach-shared, then facility-server, all SUCCESS | Build | PRD section 7 | Passing |
-| TC-004-02 | The shared module stays small | The shared module's `pom.xml` | `.\mvnw.cmd -pl shared dependency:tree` runs in `server/` | Compile scope holds only `uuid-creator`; everything else is test scope | Build | PRD section 7 | Passing |
+| TC-004-01 | The shared module is part of the build | `server/pom.xml` lists `shared`, and `facility-server` depends on `shared` | `.\mvnw.cmd validate` runs in `server/` | The reactor lists e-Reach, then ereach-shared, then facility-server, all SUCCESS | Build | PRD section 7 | Passing (01/11/2026) |
+| TC-004-02 | The shared module stays small (version 2, 01/11/2026, under D-003; version 1 allowed only `uuid-creator` in compile scope) | The shared module's `pom.xml` | `.\mvnw.cmd -pl shared dependency:tree` runs in `server/` | Of the dependencies `shared` declares itself, `uuid-creator` is the only required compile dependency, the Spring Boot starters are compile and optional, and everything else is test scope | Build | PRD section 7, D-003 | Passing (01/11/2026) |
 | TC-004-03 | New IDs are UUIDv7 | Nothing | `Ids.newId()` is called | The UUID's `version()` is 7 and its `variant()` is 2 | Unit | Rule 4, ADR-006 | Passing |
 | TC-004-04 | IDs from different milliseconds sort in creation order, the way PostgreSQL sorts them | ID `a` is created, then at least 2 ms pass | ID `b` is created | `a.toString()` sorts before `b.toString()` | Unit | Rule 4 | Passing |
 | TC-004-05 | IDs are unique under load | Nothing | 100,000 IDs are created in a tight loop | All 100,000 values are distinct | Unit | Rule 4 | Passing |
