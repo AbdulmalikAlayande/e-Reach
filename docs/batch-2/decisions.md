@@ -196,7 +196,7 @@ Accepted means build it. Provisional means build it with the default described, 
 
 - Spring Security with server-side sessions stored by Spring Session JDBC. The browser holds only a `SESSION` cookie (`HttpOnly`, `Secure`, `SameSite=Strict`).
 - Passwords and PINs are hashed with `Argon2PasswordEncoder.defaultsForSpringSecurity_v5_8()`.
-- MFA is required for `facility_admin`, `data_protection_lead`, `platform_operator` and every clinical role (`doctor`, `nurse`, `lab_scientist`, `pharmacist`); clinicians have 30 days from getting the role to set it up (amended 27/10/2026, PRD B2-13). MFA is a TOTP code (RFC 6238), a code sent by email, or a passkey on a security key the facility issues (amended 01/11/2026, ADR-020). TOTP secrets are stored encrypted with AES-GCM, the key coming from the environment, and a code is accepted once only (`mfa_method.last_used_step`). A security key is stored only as its public key, in `user_security_key`.
+- MFA is required for every staff role: at once for platform operators, `facility_admin` and `data_protection_lead`, and within 30 days of getting the role for every other role (amended 01/11/2026, decision log D-028; first amended 27/10/2026, PRD B2-13). MFA is a TOTP code (RFC 6238), a code sent by email, or a passkey on a security key the facility issues (amended 01/11/2026, ADR-020). TOTP secrets are stored encrypted with AES-GCM, the key coming from the environment, and a code is accepted once only (`mfa_method.last_used_step`). A security key is stored only as its public key, in `user_security_key`.
 - Failed sign-ins never lock the account. `sign_in_throttle` counts failures per username and client IP, and password-only attempts from that PC wait longer after each failure; the facility admin is alerted when one account fails from many PCs. During a backoff, the password and MFA together still sign in from that PC, in one request with one generic error and their own attempt limit, with an audit event and an admin alert (amended 27/10/2026, PRD B2-13).
 - After `session.idle_lock_minutes` of inactivity the session is locked: only `POST /auth/unlock` with the owner's PIN works. Three wrong PINs end the session (assumed).
 - A session expires `session.max_hours` after sign-in, whatever the activity.
@@ -574,7 +574,7 @@ Accepted means build it. Provisional means build it with the default described, 
 
 **Decision.**
 
-- The installer creates the first operator (name, username, password, PIN, MFA), running as the INSTALLER system actor, only when no operator exists. Existing operators add further operators.
+- The installer creates the first operator (name, username, email, optional phone, password, PIN, MFA), running as the INSTALLER system actor, only while no confirmed operator exists. It is a first-run screen in the desktop app behind a one-time setup code, and it finishes only when the operator's first MFA code is confirmed (amended 01/11/2026, decision log D-022, D-024 and D-029). Existing operators add further operators.
 - Being an operator is `user_account.is_platform_operator`; system accounts can never have it; `platform_operator` leaves the facility role list. An operator with no membership sees no facility data, because row-level security needs `app.facility_id`.
 - Staff, including a facility's first `facility_admin`, join by invitation: a single-use, expiring joining code, also emailed when the internet is up, whose link opens the installed app. An existing user on the same server joins from the facility switcher with the code and their PIN.
 
