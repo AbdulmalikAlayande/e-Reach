@@ -127,6 +127,10 @@ SHA-1, 6 digits, 30-second steps, as every common app supports; one step of drif
 **Replaces:** the full unique indexes in the first V2.
 **See:** V2, `PlatformSchemaRulesTests` (TC-006-20, TC-006-21).
 
+### D-019 · 01/11/2026 · Typed IDs are mapped as primary keys through a Hibernate JavaType · Built
+Hibernate 7 refuses an `AttributeConverter` on an `@Id`. A primary key is mapped as `@Id @JavaType(FacilityIdJavaType.class) @JdbcTypeCode(SqlTypes.UUID)`. `TypedIdJavaType` in `shared` holds the shared logic, and each typed ID has a small subclass: `FacilityIdJavaType` and `UserIdJavaType` in `shared`, `ClinicIdJavaType` in `platform`. A typed ID in any other attribute keeps its `AttributeConverter`, named with an explicit `@Convert`, because entity scanning does not reach `ng.ereach.shared`, so `autoApply` on the `shared` converters has no effect.
+**See:** `ng.ereach.shared.converters.TypedIdJavaType`, `Facility`, `Clinic`, `UserAccount`.
+
 ---
 
 ## Tests
