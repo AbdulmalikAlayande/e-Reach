@@ -196,6 +196,10 @@ A missing or wrong setup code is 403 `ACCESS_DENIED`; once a confirmed operator 
 ### D-017 · 28/10/2026 · Tests empty the V3 tables too · Decided
 Every `@BeforeEach` that empties tables must include `role_assignment, facility_membership, user_security_key` before `facility`, because they reference it. `user_account` is never truncated, because that would delete the system actors; tests delete their own person accounts with `DELETE FROM user_account WHERE kind = 'person'`.
 
+### D-030 · 01/11/2026 · Tests that make accounts also empty the MFA and profile tables · Decided
+A test that creates person accounts truncates `mfa_challenge, mfa_method, practitioner_profile` as well, before deleting the person accounts, because those rows reference `user_account`.
+**See:** `UserAccountSchemaRulesTests`, `PlatformOperatorSetupTests`.
+
 ---
 
 ## Open questions
