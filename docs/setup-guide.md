@@ -1,6 +1,8 @@
 # e-Reach Setup Guide
 
-Oct 17, 2026 · @Abdulmalik Alayande
+> This file in `docs/` is the original; the earlier shared copy stopped being updated on 27/10/2026. It covers setup up to ER-006; the `iam` tables and the MFA encryption key (`EREACH_MFA_ENCRYPTION_KEY`) are not described here yet.
+
+Oct 27, 2026 · @Abdulmalik Alayande
 
 This book takes you from an empty folder to a running e-Reach facility server: a Spring Boot application, a Maven build with room for more modules, a PostgreSQL database that keeps the application on a short leash, and tests that run against the real thing.
 
@@ -10,7 +12,7 @@ Read the chapters in order the first time. Each one adds a single layer to the s
 
 The chapters follow the order in which the work has to be done, which is also the order in which a fresh machine or a new team member would meet it. Chapter 11 collects every problem we actually ran into while setting e-Reach up, written from the symptom backwards, so that when you see an error you can look up the error rather than reread the book. The appendix holds the finished version of every file, in case you want to compare your own copy line by line.
 
-Commands are written for Windows PowerShell, because that is where e-Reach was first set up. On Linux or macOS, use `./mvnw` wherever you see `.\mvnw.cmd`; everything else is the same.
+Commands are written for Windows PowerShell, because that is where e-Reach was first set up. On Linux or macOS, use `./mvnw` wherever you see `.\mvnw.cmd`; everything else is the same. The Maven build lives in eReach/server/: in this guide "the root" means that folder, and Maven commands run from there. Docker commands run from eReach/, where deploy/ lives.
 
 The versions used throughout are Java 25, Spring Boot 4.1.1, Spring Modulith 2.1.1, Spring Session 4.1.1, Testcontainers 2.0.5 and PostgreSQL 18. If you set up a newer version of any of them, the steps stay the same, but the library files you copy in Chapter 8 must come from your versions, not from this book.
 
@@ -24,12 +26,15 @@ The folder layout you will end up with looks like this:
 
 ```text
 eReach/
-├── pom.xml                  the root build: shared versions and the list of modules
-├── mvnw, mvnw.cmd, .mvn/    the Maven wrapper
 ├── .gitignore, .gitattributes
-├── backend/
+├── 2023-archive/            the 2023 code, read-only
+├── server/                  the Maven build ("the root" in this guide)
+│   ├── pom.xml              the root build: shared versions and the list of modules
+│   ├── mvnw, mvnw.cmd, .mvn/    the Maven wrapper
 │   ├── facility-server/     the hospital application (its own pom.xml)
+│   ├── shared/              what both servers share: IDs, Money, BaseEntity, the error module (its own pom.xml)
 │   └── central-server/      empty for now
+├── client/                  the frontend (SvelteKit, later)
 └── deploy/
     ├── dev.yml              the development database
     └── dev-init.sql         creates the two database users
@@ -43,7 +48,7 @@ The second is that **only migrations change the database's shape.** Every table,
 
 The third is that **tests run against the real database.** The tests start a genuine PostgreSQL 18 in Docker, create the same two users, and run the same migrations, so a test that passes has passed under the same rules the hospital's server will enforce (Chapter 9).
 
-&#91;embedded content: who connects to which database, and as whom\]
+![who connects to which database, and as whom](setup-guide-images/image1.png)
 
 The tests and the running application follow the same rule against two different databases: the application connects as `ereach_app`, Flyway as `ereach_owner`, and nothing connects as the superuser.
 
@@ -100,7 +105,7 @@ Then add these dependencies. Each one earns its place in the application, and kn
 | Spring Modulith | Enforces the boundaries between e-Reach's modules and delivers events between them reliably |
 | Testcontainers | Starts a real PostgreSQL in Docker for the tests |
 
-Download the zip, create an `eReach` folder with a `backend` folder inside it, and unzip the project into `eReach/backend/facility-server`.
+Download the zip, create an `eReach` folder with a `server` folder inside it, and unzip the project into `eReach/server/facility-server`.
 
 Open the generated `pom.xml` and make one change straight away. Because you chose both Spring Data JPA and Spring Modulith, Initializr adds `spring-modulith-starter-jpa`, which stores Modulith's events through Hibernate. Replace it with `spring-modulith-starter-jdbc`. The JDBC variant ships a plain SQL file for its table, which we can hand to Flyway as a migration, and that keeps the rule from Chapter 1 that only migrations create tables. Our decision records (ADR-001) chose the JDBC variant for exactly this reason.
 
@@ -118,7 +123,7 @@ Initializr gave you a project that builds on its own. e-Reach needs a build that
 
 The Maven wrapper is the pair of scripts `mvnw` (Linux and macOS) and `mvnw.cmd` (Windows), plus a `.mvn` folder whose `wrapper/maven-wrapper.properties` file names an exact Maven version. When you run the wrapper, it downloads that Maven version once into your user folder and then runs it. Anyone who clones the repository, including the CI server, therefore builds with the same Maven without installing anything.
 
-Initializr put the wrapper inside `backend/facility-server`. Move `mvnw`, `mvnw.cmd` and the `.mvn` folder up to the `eReach` root. A Maven build starts from the folder you run it in, and the whole repository should be built from its root; a wrapper buried inside one module could only ever build that module.
+Initializr put the wrapper inside `server/facility-server`. Move `mvnw`, `mvnw.cmd` and the `.mvn` folder up to `server`, the root of the build. A Maven build starts from the folder you run it in, and the whole build should be run from its root; a wrapper buried inside one module could only ever build that module.
 
 Check it from the root:
 
@@ -142,16 +147,16 @@ The parts that matter, with the complete file in the appendix:
 - `<groupId>ng.ereach</groupId>`, `<artifactId>ereach</artifactId>` and `<version>0.0.1-SNAPSHOT</version>` name the root project. The artifactId must be unique in the build; it must not be `facility-server`, which belongs to the child.
 - `<packaging>pom</packaging>` says this project produces no JAR of its own. It only organises other projects.
 - `<properties>` holds `java.version` (25) and `spring-modulith.version` (2.1.1).
-- `<modules>` lists `backend/facility-server`, and only that. A folder listed here must contain its own `pom.xml`, or the whole build fails, so `central-server` joins the list on the day it gets one.
+- `<modules>` lists `facility-server` and `shared`, and only those. A folder listed here must contain its own `pom.xml`, or the whole build fails, so `central-server` joins the list on the day it gets one.
 - `<dependencyManagement>` imports the Spring Modulith BOM (bill of materials), a published list of matching versions for every Modulith library. Importing it means no module ever writes a Modulith version number by hand.
 
 The difference between `<dependencyManagement>` and `<dependencies>` is the one most people trip over. `<dependencyManagement>` only says *if* a module uses this library, use this version; it adds nothing to any module. `<dependencies>` actually adds a library to the project and to every project that inherits from it. That is why **the root build file has no `<dependencies>` element at all**: anything placed there would be forced into every module, including the central server, which needs none of the facility server's database or web libraries.
 
 ### The child build file
 
-In `backend/facility-server/pom.xml`, change three things and leave the dependency list and the `<build>` section alone.
+In `server/facility-server/pom.xml`, change three things and leave the dependency list and the `<build>` section alone.
 
-1. Replace the `<parent>` element so that it points at the root project: `ng.ereach`, `ereach`, `0.0.1-SNAPSHOT`, with `<relativePath>../../pom.xml</relativePath>`. Maven looks for a parent one folder up by default. The facility server is two folders below the root, so without this line Maven goes looking for `ng.ereach:ereach` on the internet and fails with "Non-resolvable parent POM".
+1. Replace the `<parent>` element so that it points at the root project: `ng.ereach`, `ereach`, `0.0.1-SNAPSHOT`, with `<relativePath>../pom.xml</relativePath>`. The facility server is one folder below the root, which is where Maven looks for a parent by default; the line makes that explicit, so a moved module fails loudly instead of Maven going looking for `ng.ereach:ereach` on the internet and failing with "Non-resolvable parent POM".
 2. Delete the child's own `<groupId>` and `<version>`. Both are inherited, which means one version number to change for the whole build.
 3. Delete the child's `<properties>`, its `<dependencyManagement>` block and its empty metadata elements. The root now provides all of them, and a leftover copy in the child would silently override the root if the two ever disagreed.
 
@@ -165,7 +170,7 @@ Two small files also belong at the root rather than inside the module.
 
 `.gitattributes` controls line endings. Windows ends lines differently from Linux, and the `mvnw` script stops working on Linux, including on the CI server, if it is saved with Windows line endings. Move the generated `.gitattributes` to the root. Its two lines force `mvnw` to stay Linux-style and `.cmd` files to stay Windows-style, whichever machine edits them.
 
-Git does not store empty folders, so put an empty file called `.gitkeep` in `backend/central-server` to keep the folder in the repository until it has real content.
+Git does not store empty folders, so put an empty file called `.gitkeep` in `server/central-server` to keep the folder in the repository until it has real content.
 
 ### Check the build
 
@@ -175,7 +180,7 @@ From the root:
 .\mvnw.cmd validate
 ```
 
-The output ends with a Reactor Summary listing `e-Reach` and `facility-server`, both marked SUCCESS. The reactor is Maven's name for the set of modules in one build, and seeing both in it proves the parent, the aggregator and the child are wired together correctly.
+The output ends with a Reactor Summary listing `e-Reach`, `ereach-shared` and `facility-server`, all marked SUCCESS. The reactor is Maven's name for the set of modules in one build, and seeing all three in it proves the parent, the aggregator and the children are wired together correctly.
 
 ## Chapter 5. The two database users
 
@@ -261,7 +266,7 @@ The list should show `ereach_owner`, `ereach_app` and `postgres`.
 
 ## Chapter 7. Configuring the application
 
-Spring Boot reads its settings from `backend/facility-server/src/main/resources/application.yml`. Initializr creates `application.properties`; the YAML form says the same things with less repetition, so rename it and replace its contents with:
+Spring Boot reads its settings from `server/facility-server/src/main/resources/application.yml`. Initializr creates `application.properties`; the YAML form says the same things with less repetition, so rename it and replace its contents with:
 
 ```yaml
 spring:
@@ -305,7 +310,7 @@ Each setting exists for a reason that traces back to the three ideas in Chapter 
 
 ## Chapter 8. Migrations
 
-A migration is a SQL file that changes the database by one step. Flyway keeps them in `backend/facility-server/src/main/resources/db/migration`. Every time the application starts, Flyway compares the files in that folder with a table it keeps in the database, `flyway_schema_history`, and runs any file it has not run before, in version order, as `ereach_owner`. A hospital's database that is three releases behind and a brand-new test database therefore end up in exactly the same state, by running exactly the same files.
+A migration is a SQL file that changes the database by one step. Flyway keeps them in `server/facility-server/src/main/resources/db/migration`. Every time the application starts, Flyway compares the files in that folder with a table it keeps in the database, `flyway_schema_history`, and runs any file it has not run before, in version order, as `ereach_owner`. A hospital's database that is three releases behind and a brand-new test database therefore end up in exactly the same state, by running exactly the same files.
 
 ### How Flyway reads a file name
 
@@ -344,7 +349,7 @@ Both libraries ship the exact SQL for their tables inside their own JAR files, o
 A JAR is an ordinary zip file, and Windows' built-in `tar` command can read it. First confirm which versions your build uses:
 
 ```powershell
-.\mvnw.cmd -pl backend/facility-server dependency:list | findstr "spring-session spring-modulith-events-jdbc"
+.\mvnw.cmd -pl facility-server dependency:list | findstr "spring-session spring-modulith-events-jdbc"
 ```
 
 Then list and extract the PostgreSQL files into a scratch folder, replacing the versions with the ones the command printed:
@@ -388,7 +393,7 @@ Initializr generates a `TestcontainersConfiguration` class that declares the dat
 
 ### The users script for tests
 
-`backend/facility-server/src/test/resources/ereach-test-roles.sql` holds the same three statements as `deploy/dev-init.sql`. Files under `src/test/resources` are on the test classpath, which is where Testcontainers looks for it.
+`server/facility-server/src/test/resources/ereach-test-roles.sql` holds the same three statements as `deploy/dev-init.sql`. Files under `src/test/resources` are on the test classpath, which is where Testcontainers looks for it.
 
 ### The base class: `PostgresIntegrationTest`
 
@@ -442,7 +447,7 @@ Spring Modulith treats each package directly under the main application's packag
 
 ## Chapter 10. Running and checking
 
-With everything in place, three commands prove the setup works, each building on the one before. Run them from the repository root with Docker Desktop running.
+With everything in place, three commands prove the setup works, each building on the one before. Run them from server/ with Docker Desktop running.
 
 ### Build and test
 
@@ -467,11 +472,11 @@ Along the way, the test log shows Testcontainers starting `postgres:18`, running
 Start the development database if it is not running, then the application:
 
 ```powershell
-docker compose -f deploy/dev.yml up -d
-.\mvnw.cmd -pl backend/facility-server spring-boot:run
+docker compose -f ../deploy/dev.yml up -d
+.\mvnw.cmd -pl facility-server spring-boot:run
 ```
 
-`-pl backend/facility-server` (project list) runs the command for that one module while still reading the root build file. The log should show Flyway connecting to `localhost:5433`, the migrations applying the first time (and "Schema ... is up to date" on later runs), and Tomcat starting on port 8080. Stop it with Ctrl+C.
+`-pl facility-server` (project list) runs the command for that one module while still reading the root build file. The log should show Flyway connecting to `localhost:5433`, the migrations applying the first time (and "Schema ... is up to date" on later runs), and Tomcat starting on port 8080. Stop it with Ctrl+C.
 
 Two log lines look like warnings but are expected at this stage:
 
@@ -496,7 +501,7 @@ Every problem below happened while e-Reach was being set up. Each is written fro
 | What you see | What is actually wrong | Fix |
 | --- | --- | --- |
 | Any Maven command at the root fails immediately, or the root and the module share one name | The root `pom.xml` is empty, or was copied from the module and still says `<artifactId>facility-server</artifactId>` | Give the root its own artifactId (`ereach`) and `<packaging>pom</packaging>` (Chapter 4) |
-| `Non-resolvable parent POM` | The module's `<relativePath>` is missing or wrong, so Maven looks for the parent online | `<relativePath>../../pom.xml</relativePath>` in the module, matching the root's groupId, artifactId and version exactly |
+| `Non-resolvable parent POM` | The module's `<relativePath>` is missing or wrong, so Maven looks for the parent online | `<relativePath>../pom.xml</relativePath>` in the module, matching the root's groupId, artifactId and version exactly |
 | `.\mvnw.cmd` is not recognised | The wrapper was left inside the module, or deleted | Copy `mvnw`, `mvnw.cmd` and `.mvn` from a fresh Initializr download to the root |
 | The build fails because a module folder has no `pom.xml` | An empty folder (such as `central-server`) is listed in `<modules>` | List a module only once it has its own `pom.xml` |
 | A rule in `.gitignore` has no effect | The pattern starts with `../`; Git ignores patterns that climb out of the file's folder | Keep one `.gitignore` at the root with paths relative to the root |
@@ -567,7 +572,8 @@ These are the files as they stood when the facility server first ran, with perso
     </properties>
 
     <modules>
-        <module>backend/facility-server</module>
+        <module>facility-server</module>
+        <module>shared</module>
     </modules>
 
     <dependencyManagement>
@@ -584,7 +590,7 @@ These are the files as they stood when the facility server first ran, with perso
 </project>
 ```
 
-### `backend/facility-server/pom.xml`
+### `server/facility-server/pom.xml`
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -596,7 +602,7 @@ These are the files as they stood when the facility server first ran, with perso
 		<groupId>ng.ereach</groupId>
 		<artifactId>ereach</artifactId>
 		<version>0.0.1-SNAPSHOT</version>
-		<relativePath>../../pom.xml</relativePath>
+		<relativePath>../pom.xml</relativePath>
 	</parent>
 
 	<artifactId>facility-server</artifactId>
@@ -648,13 +654,13 @@ These are the files as they stood when the facility server first ran, with perso
 
 The dependencies are written one per line here to fit the page; in your file each element can sit on its own lines, which makes no difference to Maven.
 
-### `backend/facility-server/src/main/resources/application.yml`
+### `server/facility-server/src/main/resources/application.yml`
 
 As shown in full in Chapter 7.
 
 ### `deploy/dev.yml` and `deploy/dev-init.sql`
 
-As shown in full in Chapter 6. `backend/facility-server/src/test/resources/ereach-test-roles.sql` contains the same three statements as `dev-init.sql`.
+As shown in full in Chapter 6. `server/facility-server/src/test/resources/ereach-test-roles.sql` contains the same three statements as `dev-init.sql`.
 
 ### `db/migration/V1__extensions.sql`
 
