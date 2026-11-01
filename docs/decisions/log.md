@@ -72,7 +72,7 @@ The order is in `docs/pending-features.md`: platform operator setup, sign-in, fa
 The installer (a screen or the command line) asks for the operator's name, username, password and PIN and sets up MFA, running as the INSTALLER system actor. It works only when no operator exists yet. Further operators are added by an existing operator. On a new PC an operator simply installs the app and signs in, because accounts live on the server. The installer never asks for facility data.
 **Replaces:** PRD F1, where creating a facility also created the first `facility_admin` with a one-time password shown to the operator.
 
-### D-009 · 01/11/2026 · Being a platform operator is a flag on the account · Decided, not yet in V3
+### D-009 · 01/11/2026 · Being a platform operator is a flag on the account · Built (schema)
 `user_account.is_platform_operator boolean NOT NULL DEFAULT false`; a system account can never have it; `platform_operator` leaves the `role_assignment.role_code` list.
 **Why:** the role belongs to the whole server, not to a facility, and a membership needs a facility. An operator with no membership has no `app.facility_id`, so row-level security already hides all patient data from them.
 **Replaces:** `platform_operator` as a facility role assignment.
