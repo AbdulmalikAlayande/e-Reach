@@ -135,6 +135,12 @@ Hibernate 7 refuses an `AttributeConverter` on an `@Id`. A primary key is mapped
 `Clinic` and `FacilitySetting` hold `FacilityId facilityId` on the `facility_id` column instead of a `@ManyToOne` to `Facility`. Hibernate 7 cannot load a to-one association lazily when the target entity has `@SoftDelete`, and an eager one would load the facility row with every clinic and setting.
 **See:** `Clinic`, `FacilitySetting`.
 
+### D-021 · 01/11/2026 · Usernames are stored as typed and unique ignoring case · Built (schema)
+A username belongs to its user, so it is kept exactly as they typed it: 3 to 40 letters (either case), digits, dots, underscores or hyphens. Uniqueness ignores case (`ux_user_account_username` is on `lower(username)`), so two accounts can never differ only by case and look the same on screen or in the audit trail.
+**Replaces:** PRD F2's "stored lower-case" and V3's lower-case-only check.
+**Still to build:** sign-in and the sign-in throttle must compare usernames ignoring case too, or a changed capital would get round the backoff (ADR-007).
+**See:** V3, `UserAccountSchemaRulesTests` (TC-007-27, TC-007-62).
+
 ---
 
 ## Tests
