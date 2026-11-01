@@ -166,6 +166,10 @@ Until the new operator confirms their first MFA code, the step is not finished: 
 The operator chooses an authenticator app, an email code or a passkey, like every other user. Each method is a separate handler that `MFAService` selects by type, so email and passkeys plug in when they are built without changing the flow. Until then the screen shows them disabled, and the server refuses a request for one with 501 `MFA_METHOD_NOT_AVAILABLE`; an unknown method stays 400 `MFA_METHOD_NOT_SUPPORTED`.
 **See:** TC-007-56.
 
+### D-027 · 01/11/2026 · QR codes are drawn with ZXing · Decided
+The server draws the authenticator QR code itself (transcript of 01/11/2026) as a PNG, sent as a `data:image/png;base64,` image in `MfaResponse.qrCodeImage`, using `com.google.zxing:core` 3.5.3 (Apache 2.0, no dependencies of its own). The tests decode the same PNG with ZXing to check the provisioning URI inside it. ZXing is understood to be in maintenance mode, taking bug fixes only, which is enough for drawing a QR code; this was not checked against the project's current statement.
+**See:** `facility-server/pom.xml`, TC-007-47.
+
 ---
 
 ## Tests
