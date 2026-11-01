@@ -283,23 +283,27 @@ CREATE TABLE user_account (
     email                   TEXT CHECK (email = lower(email) AND email ~ '^[^@\s]+@[^@\s]+\.[^@\s]+$'),
     phone                   TEXT CHECK (phone ~ '^\+[1-9][0-9]{6,14}$'),
     password_hash           TEXT,
-    must_change_password    BOOLEAN NOT NULL DEFAULT true,-- true while the one-time password is in use
+    must_change_password    BOOLEAN NOT NULL DEFAULT false, -- true only after an admin forces a reset; nobody gets a temporary password (D-023)
     pin_hash                TEXT,
-    mfa_required_by             TIMESTAMPTZ,-- end of a clinician's 30-day grace period, they must have a confirmed MFA method by then
-    status                TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'suspended')),
-    created_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
-    created_by            UUID NOT NULL DEFAULT NULLIF(current_setting('app.user_id', true), '')::UUID,
-    updated_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_by            UUID NOT NULL DEFAULT NULLIF(current_setting('app.user_id', true), '')::UUID,
-    row_version           BIGINT NOT NULL DEFAULT 0,
-    deleted_at            TIMESTAMPTZ,
+    mfa_required_by         TIMESTAMPTZ,-- by when a confirmed MFA method is needed: at once for elevated roles, 30 days for every other role (D-028)
+    status                  TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'suspended')),
+    is_platform_operator    BOOLEAN NOT NULL DEFAULT false,
+    created_at              TIMESTAMPTZ NOT NULL DEFAULT now(),
+    created_by              UUID NOT NULL DEFAULT NULLIF(current_setting('app.user_id', true), '')::UUID,
+    updated_at              TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_by              UUID NOT NULL DEFAULT NULLIF(current_setting('app.user_id', true), '')::UUID,
+    row_version             BIGINT NOT NULL DEFAULT 0,
+    deleted_at              TIMESTAMPTZ,
 
     -- A person (human) always has a password, but a system actor don't have one.
     CONSTRAINT ck_user_account_password CHECK ((kind = 'person') = (password_hash IS NOT NULL)),
 
-    -- A system actor never has a PIN, an email or an MFA deadline.
+    -- A person always has an email address (D-022); a system actor never has one (next check).
+    CONSTRAINT ck_user_account_person_email CHECK (kind <> 'person' OR email IS NOT NULL),
+
+    -- A system actor never has a PIN, an email or an MFA deadline, and is never a platform operator.
     CONSTRAINT ck_user_account_system_secrets
-        CHECK (kind = 'person' OR (pin_hash IS NULL AND email IS NULL AND mfa_required_by IS NULL))
+        CHECK (kind = 'person' OR (pin_hash IS NULL AND email IS NULL AND mfa_required_by IS NULL AND is_platform_operator = false))
 
     -- If mfa_required_by is not null and its value is lesser than now
 );
