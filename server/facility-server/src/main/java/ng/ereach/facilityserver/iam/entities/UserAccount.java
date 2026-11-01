@@ -26,7 +26,7 @@ public class UserAccount extends BaseEntity {
 
     private UserAccountKind kind;
 
-    @Pattern(regexp = "^[a-z0-9._-]{3,40}$")
+    @Pattern(regexp = "^[A-Za-z0-9._-]{3,40}$")
     private String username;
 
     @Email(regexp = "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")
