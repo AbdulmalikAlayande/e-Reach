@@ -162,6 +162,10 @@ Until the new operator confirms their first MFA code, the step is not finished: 
 - An invitation to an email that already has an account on the server does not fail: the person is sent to join from the facility switcher (D-010). Only the admin who invites may see that the address already has an account; an anonymous screen never confirms that an email exists.
 **See:** TC-007-41.
 
+### D-026 · 01/11/2026 · The installer offers all three MFA methods · Decided
+The operator chooses an authenticator app, an email code or a passkey, like every other user. Each method is a separate handler that `MFAService` selects by type, so email and passkeys plug in when they are built without changing the flow. Until then the screen shows them disabled, and the server refuses a request for one with 501 `MFA_METHOD_NOT_AVAILABLE`; an unknown method stays 400 `MFA_METHOD_NOT_SUPPORTED`.
+**See:** TC-007-56.
+
 ---
 
 ## Tests
