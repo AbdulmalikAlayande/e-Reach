@@ -38,7 +38,7 @@ public class UserAccount extends BaseEntity {
     private String phone;
     private String passwordHash;
 
-    private Boolean mustChangePassword = Boolean.TRUE;
+    private Boolean mustChangePassword = Boolean.FALSE; // true only after an admin forces a reset (D-023)
     private String pinHash;
     private Instant mfaRequiredBy;
 
