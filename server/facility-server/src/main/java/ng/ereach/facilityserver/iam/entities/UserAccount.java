@@ -1,6 +1,7 @@
 package ng.ereach.facilityserver.iam.entities;
 
 import jakarta.persistence.Convert;
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.validation.constraints.Email;
@@ -36,10 +37,10 @@ public class UserAccount extends BaseEntity {
 
     private Boolean mustChangePassword = Boolean.TRUE;
     private String pinHash;
-    private byte[] mfaSecretEncrypted;
-    private Instant mfaEnrolledAt;
     private Instant mfaRequiredBy;
-    private int mfaLastUsedStep;
+
+    @Column(name = "is_platform_operator", nullable = false)
+    private boolean platformOperator = false;
 
     private UserAccountStatus status;
 
