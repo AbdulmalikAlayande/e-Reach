@@ -1,6 +1,5 @@
-package ng.ereach.facilityserver.platform.converters;
+package ng.ereach.shared.converters;
 
-import ng.ereach.shared.converters.TypedIdJavaType;
 import ng.ereach.shared.id.ClinicId;
 
 /** Maps {@link ClinicId} as a primary key (see {@link TypedIdJavaType}). */

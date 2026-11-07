@@ -2,7 +2,7 @@ package ng.ereach.facilityserver.platform.entities;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Pattern;
-import ng.ereach.facilityserver.platform.converters.ClinicIdJavaType;
+import ng.ereach.shared.converters.ClinicIdJavaType;
 import org.hibernate.annotations.JavaType;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
@@ -59,10 +59,6 @@ public class Clinic extends BaseEntity {
 
     public ClinicId getId() {
         return id;
-    }
-
-    public FacilityId getFacilityId() {
-        return facilityId;
     }
 
     public String getCode() {
